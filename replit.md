@@ -1,6 +1,6 @@
-# [Project name]
+# PropFlow
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+PropFlow helps landlords manage properties, tenant assignments, rent payments, and revision reminders in one live workspace.
 
 ## Run & Operate
 
@@ -22,23 +22,30 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/propflow/src/App.tsx` — primary workspace UI and interactions
+- `artifacts/propflow/src/components/propflow-ui.tsx` — dashboard, setup, ledger, and modal components
+- `lib/api-spec/openapi.yaml` — source of truth for the property, flat, payment, dashboard, and activity API
+- `lib/db/src/schema/index.ts` — PostgreSQL schema for properties, flats, and payments
+- `artifacts/api-server/src/routes/propflow.ts` — API handlers and aggregate queries
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- The app uses the workspace PostgreSQL database through Drizzle's shared database package.
+- API contracts are generated from OpenAPI and consumed through typed React Query hooks.
+- The dashboard's revision alert is derived from an 11-month elapsed lease threshold.
+- The frontend keeps the live-sync indicator tied to the health endpoint and invalidates affected query caches after writes.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Landlords can create properties, assign tenants to units, edit rent, log payments with per-unit history, filter the ledger, monitor collection metrics, and export the visible ledger as CSV.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+The user requested a sleek dark-mode property management and rent tracking experience named PropFlow.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+The generated Zod package currently targets Zod 3, so UUID/integer OpenAPI formats must avoid generated `zod.uuid()` and `zod.int()` helpers.
 
 ## Pointers
 

@@ -1,0 +1,1 @@
+- [OpenAPI/Zod compatibility](openapi-zod-compatibility.md) — generated validators must stay compatible with the workspace's installed Zod version.

@@ -1,22 +1,28 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: PropFlow property management API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: properties
+    description: Property management
+  - name: flats
+    description: Units and tenant assignments
+  - name: payments
+    description: Rent payment records
+  - name: dashboard
+    description: Dashboard summaries
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +30,298 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /properties:
+    get:
+      operationId: listProperties
+      tags: [properties]
+      summary: List properties
+      responses:
+        "200":
+          description: Properties
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Property"
+    post:
+      operationId: createProperty
+      tags: [properties]
+      summary: Create a property
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PropertyInput"
+      responses:
+        "201":
+          description: Created property
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Property"
+  /properties/{id}:
+    patch:
+      operationId: updateProperty
+      tags: [properties]
+      summary: Update a property
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PropertyUpdate"
+      responses:
+        "200":
+          description: Updated property
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Property"
+    delete:
+      operationId: deleteProperty
+      tags: [properties]
+      summary: Delete a property
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Deleted
+  /flats:
+    get:
+      operationId: listFlats
+      tags: [flats]
+      summary: List flats with payment totals
+      parameters:
+        - in: query
+          name: propertyId
+          schema:
+            type: string
+          required: false
+      responses:
+        "200":
+          description: Flats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Flat"
+    post:
+      operationId: createFlat
+      tags: [flats]
+      summary: Create a flat and assign a tenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlatInput"
+      responses:
+        "201":
+          description: Created flat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Flat"
+  /flats/{id}:
+    patch:
+      operationId: updateFlat
+      tags: [flats]
+      summary: Update a flat
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlatUpdate"
+      responses:
+        "200":
+          description: Updated flat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Flat"
+    delete:
+      operationId: deleteFlat
+      tags: [flats]
+      summary: Delete a flat
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Deleted
+  /flats/{id}/payments:
+    get:
+      operationId: listFlatPayments
+      tags: [payments]
+      summary: List payment history for a flat
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payment"
+    post:
+      operationId: createPayment
+      tags: [payments]
+      summary: Record a payment
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentInput"
+      responses:
+        "201":
+          description: Created payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary
+      responses:
+        "200":
+          description: Dashboard metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /activity:
+    get:
+      operationId: listActivity
+      tags: [dashboard]
+      summary: Get recent activity
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Activity"
 components:
+  parameters:
+    Id:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
   schemas:
     HealthStatus:
       type: object
       properties:
         status:
           type: string
-      required:
-        - status
-
+      required: [status]
+    Property:
+      type: object
+      required: [id, createdAt, name, address, unitCount]
+      properties:
+        id: { type: string }
+        createdAt: { type: string, format: date-time }
+        name: { type: string }
+        address: { type: string }
+        unitCount: { type: number }
+    PropertyInput:
+      type: object
+      required: [name, address]
+      properties:
+        name: { type: string, minLength: 1 }
+        address: { type: string, minLength: 1 }
+    PropertyUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        address: { type: string, minLength: 1 }
+    Flat:
+      type: object
+      required: [id, createdAt, propertyId, propertyName, flatNo, tenantName, workplace, govtId, moveInDate, deposit, rent, totalPaid, lastPaymentDate]
+      properties:
+        id: { type: string }
+        createdAt: { type: string, format: date-time }
+        propertyId: { type: string }
+        propertyName: { type: string }
+        flatNo: { type: string }
+        tenantName: { type: string }
+        workplace: { type: string }
+        govtId: { type: string }
+        moveInDate: { type: string, format: date }
+        deposit: { type: number }
+        rent: { type: number }
+        totalPaid: { type: number }
+        lastPaymentDate: { type: ["string", "null"], format: date }
+    FlatInput:
+      type: object
+      required: [propertyId, flatNo, tenantName, workplace, govtId, moveInDate, deposit, rent]
+      properties:
+        propertyId: { type: string }
+        flatNo: { type: string, minLength: 1 }
+        tenantName: { type: string, minLength: 1 }
+        workplace: { type: string }
+        govtId: { type: string }
+        moveInDate: { type: string, format: date }
+        deposit: { type: number, minimum: 0 }
+        rent: { type: number, minimum: 0 }
+    FlatUpdate:
+      type: object
+      properties:
+        flatNo: { type: string, minLength: 1 }
+        tenantName: { type: string, minLength: 1 }
+        workplace: { type: string }
+        govtId: { type: string }
+        moveInDate: { type: string, format: date }
+        deposit: { type: number, minimum: 0 }
+        rent: { type: number, minimum: 0 }
+    Payment:
+      type: object
+      required: [id, createdAt, flatId, paymentDate, amount]
+      properties:
+        id: { type: string }
+        createdAt: { type: string, format: date-time }
+        flatId: { type: string }
+        paymentDate: { type: string, format: date }
+        amount: { type: number, minimum: 0 }
+    PaymentInput:
+      type: object
+      required: [paymentDate, amount]
+      properties:
+        paymentDate: { type: string, format: date }
+        amount: { type: number, minimum: 0 }
+    DashboardSummary:
+      type: object
+      required: [expectedMonthlyRevenue, totalCollected, occupiedUnits, totalUnits, propertiesCount, dueForRevision]
+      properties:
+        expectedMonthlyRevenue: { type: number }
+        totalCollected: { type: number }
+        occupiedUnits: { type: number }
+        totalUnits: { type: number }
+        propertiesCount: { type: number }
+        dueForRevision: { type: number }
+    Activity:
+      type: object
+      required: [id, type, title, description, createdAt]
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [payment, property, tenant, revision] }
+        title: { type: string }
+        description: { type: string }
+        createdAt: { type: string, format: date-time }

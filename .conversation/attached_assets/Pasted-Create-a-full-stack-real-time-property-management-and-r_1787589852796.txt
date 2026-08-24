@@ -1,0 +1,27 @@
+Create a full-stack, real-time property management and rent tracking web app named PropFlow.
+1. Tech Stack & Architecture
+Frontend: React with Vite, styled with Tailwind CSS, Lucide React icons, and standard JavaScript/TypeScript.
+Backend & Database: Integrate Supabase via @supabase/supabase-js.
+State & Sync: Use Supabase real-time subscriptions (supabase.channel()) so updates to properties, tenants, or payments sync instantly across devices.
+2. Database Schema (Supabase SQL Setup)
+Set up three relational tables in Supabase:
+properties: id (uuid, primary key), created_at, name (text), address (text).
+flats: id (uuid, primary key), created_at, property_id (foreign key -> properties.id), flat_no (text), tenant_name (text), workplace (text), govt_id (text), move_in_date (date), deposit (numeric), rent (numeric).
+payments: id (uuid, primary key), created_at, flat_id (foreign key -> flats.id), payment_date (date), amount (numeric).
+3. UI Theme & Navigation
+Theme: Sleek dark mode (bg-slate-900, cards bg-slate-800, borders border-slate-700). Use indigo (#6366f1) for primary actions, emerald (#10b981) for completed payments, and amber (#f59e0b) for alerts.
+Navigation: Header with a logo (❖ PropFlow), connection status badge (Supabase connected), and tab navigation (Overview & Setup vs Rent Ledger).
+4. Tab 1: Setup & Profile Creation
+Add Property Card: Form to create a property record in Supabase.
+Add Unit & Assign Tenant Card: Form with a property drop-down selector to create a flat record linked to property_id. Fields for unit number, tenant name, employer/workplace, government ID, move-in date, security deposit, and base monthly rent.
+5. Tab 2: Rent Ledger & Live Dashboard
+Metrics Header Cards: Live totals calculating Total Expected Monthly Revenue, Total Recorded Rent Collected, and Occupied Units.
+Property Filter: Drop-down filter to switch views between All Properties or an individual property profile.
+Interactive Table:
+Display unit number, tenant details, govt ID, base rent, and total paid (queried via JOIN/relation from payments).
+11-Month Auto-Reminder: Calculate elapsed duration between move_in_date and current date. Display a prominent ⚠️ Rent Revision Due badge if duration \ge 11 months.
+Inline Rent Edit: Modal or popover to update the base rent value directly in the flats table.
+6. Payment Logging & CSV Export
++ Log Deposit Modal: Action button per row opening a modal to record a new payment entry in the payments table. Displays dynamic payment history for that specific flat inside the modal.
+
+📥 Export CSV Button: Query current filtered flats and associated payment records, format them into a structured .csv file with headers, and trigger an automated browser download.
