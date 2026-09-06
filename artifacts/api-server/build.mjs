@@ -3,16 +3,37 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
-import { rm } from "node:fs/promises";
+import { rm, cp } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
 
+function buildFrontend() {
+  const propflowDir = path.resolve(artifactDir, "../propflow");
+
+  // Vite's build fails fast without PORT/BASE_PATH set (see propflow/vite.config.ts);
+  // PORT only configures the (unused during build) dev/preview server, and BASE_PATH
+  // must be "/" since the frontend is served from this server's own domain root.
+  const result = spawnSync("pnpm run build", {
+    cwd: propflowDir,
+    stdio: "inherit",
+    shell: true,
+    env: { ...process.env, PORT: process.env.PORT ?? "4173", BASE_PATH: "/" },
+  });
+
+  if (result.status !== 0) {
+    throw new Error("Failed to build artifacts/propflow frontend");
+  }
+}
+
 async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
   await rm(distDir, { recursive: true, force: true });
+
+  buildFrontend();
 
   await esbuild({
     entryPoints: [path.resolve(artifactDir, "src/index.ts")],
@@ -118,6 +139,14 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
     },
   });
+
+  // Copy the frontend's static output alongside our own bundle so src/app.ts
+  // can serve it via express.static(path.join(__dirname, "public")).
+  await cp(
+    path.resolve(artifactDir, "../propflow/dist/public"),
+    path.resolve(distDir, "public"),
+    { recursive: true },
+  );
 }
 
 buildAll().catch((err) => {

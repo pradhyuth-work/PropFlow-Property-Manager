@@ -1,5 +1,6 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import path from "node:path";
 import { pinoHttp } from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
@@ -30,5 +31,17 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+const publicDir = path.join(__dirname, "public");
+app.use(express.static(publicDir));
+
+// SPA fallback: any non-API GET that didn't match a static file goes to
+// index.html so client-side routing (wouter) can take over.
+app.use((req, res, next) => {
+  if (req.method !== "GET" || req.path.startsWith("/api")) {
+    return next();
+  }
+  res.sendFile(path.join(publicDir, "index.html"));
+});
 
 export default app;
