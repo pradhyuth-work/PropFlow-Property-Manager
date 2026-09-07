@@ -43,7 +43,35 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api", router);
 
 const publicDir = path.join(__dirname, "public");
-app.use(express.static(publicDir));
+
+// Vite content-hashes every file under /assets, so a given filename's
+// content never changes - safe (and desirable) to cache aggressively.
+app.use(
+  "/assets",
+  express.static(path.join(publicDir, "assets"), {
+    immutable: true,
+    maxAge: "1y",
+  }),
+);
+
+// Everything else (index.html, favicon, robots.txt) must never be served
+// from a conditional-GET cache. Vercel's function-bundle packaging
+// normalizes file mtimes, so index.html reports the *same*
+// Last-Modified/ETag on every deploy regardless of its actual (changed)
+// content - a browser that already cached it keeps getting 304 Not
+// Modified forever and reuses its stale copy, which then references
+// content-hashed asset filenames from an old deploy that no longer exist
+// (a real 404, not the earlier MIME-mismatch bug). Disabling conditional
+// caching here forces a fresh fetch on every load instead.
+app.use(
+  express.static(publicDir, {
+    etag: false,
+    lastModified: false,
+    setHeaders: (res) => {
+      res.setHeader("Cache-Control", "no-store");
+    },
+  }),
+);
 
 // SPA fallback: any non-API GET that didn't match a static file goes to
 // index.html so client-side routing (wouter) can take over. Requests under
@@ -58,6 +86,7 @@ app.use((req, res, next) => {
   if (req.method !== "GET" || req.path.startsWith("/api") || req.path.startsWith("/assets")) {
     return next();
   }
+  res.setHeader("Cache-Control", "no-store");
   res.sendFile(path.join(publicDir, "index.html"));
 });
 
