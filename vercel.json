@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "node",
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm --filter @workspace/api-server... --if-present run build",
+  "functions": {
+    "server.mjs": {
+      "includeFiles": "artifacts/api-server/dist/public/**"
+    }
+  }
+}
