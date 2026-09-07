@@ -222,7 +222,17 @@ function AppShell({ owner }: { owner: Owner }) {
   const doLogout = () => {
     logout.mutate(undefined, {
       onSuccess: () => {
-        queryClient.clear();
+        // Drop every cached query except auth/status: clearing that one too
+        // would make AuthGate briefly read "no owner" (data undefined) and
+        // flash the account-setup screen instead of going to login. Removing
+        // /auth/me still resolves AuthGate to LoginScreen immediately (it
+        // treats missing data as logged out), while this also clears out any
+        // cached tenant/property data so it isn't left sitting in memory
+        // after logout.
+        const authStatusKey = getGetAuthStatusQueryKey()[0];
+        queryClient.removeQueries({
+          predicate: (query) => query.queryKey[0] !== authStatusKey,
+        });
       },
     });
   };
@@ -427,8 +437,13 @@ function AuthGate() {
 
   if (statusQuery.isLoading) return <AuthShell><SkeletonRows rows={3} /></AuthShell>;
   if (statusQuery.isError) return <AuthShell><ErrorState onRetry={() => statusQuery.refetch()} /></AuthShell>;
+  // isLoading alone misses the case where data was just removed from the
+  // cache (e.g. on logout) but a refetch hasn't started yet - treat "no
+  // data at all" as still-resolving too, so this doesn't briefly read as
+  // "confirmed no owner" and flash the setup screen.
+  if (statusQuery.data === undefined) return <AuthShell><SkeletonRows rows={3} /></AuthShell>;
 
-  if (statusQuery.data?.hasOwner !== true) {
+  if (statusQuery.data.hasOwner !== true) {
     return <SetupScreen onDone={() => {
       queryClient.invalidateQueries({ queryKey: getGetAuthStatusQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
