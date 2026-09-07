@@ -126,38 +126,40 @@ export interface AuthStatus {
 export interface Owner {
   id: string;
   createdAt: string;
-  email: string;
   name: string;
   /** @nullable */
   phone: string | null;
 }
 
 export interface SetupBody {
-  email: string;
-  /** @minLength 8 */
-  password: string;
+  /**
+     * 4-digit PIN
+     * @pattern ^[0-9]{4}$
+     */
+  pin: string;
   /** @minLength 1 */
   name: string;
 }
 
 export interface LoginCredentials {
-  email: string;
-  /** @minLength 1 */
-  password: string;
+  /**
+     * 4-digit PIN
+     * @pattern ^[0-9]{4}$
+     */
+  pin: string;
 }
 
 export interface OwnerUpdate {
   /** @minLength 1 */
   name?: string;
-  email?: string;
   phone?: string;
 }
 
-export interface ChangePasswordInput {
-  /** @minLength 1 */
-  currentPassword: string;
-  /** @minLength 8 */
-  newPassword: string;
+export interface ChangePinInput {
+  /** @pattern ^[0-9]{4}$ */
+  currentPin: string;
+  /** @pattern ^[0-9]{4}$ */
+  newPin: string;
 }
 
 export type ListFlatsParams = {

@@ -117,20 +117,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Owner"
-  /auth/change-password:
+  /auth/change-pin:
     post:
-      operationId: changePassword
+      operationId: changePin
       tags: [auth]
-      summary: Change the owner's password
+      summary: Change the owner's PIN
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ChangePasswordInput"
+              $ref: "#/components/schemas/ChangePinInput"
       responses:
         "204":
-          description: Password changed
+          description: PIN changed
   /properties:
     get:
       operationId: listProperties
@@ -433,35 +433,31 @@ components:
         hasOwner: { type: boolean }
     Owner:
       type: object
-      required: [id, createdAt, email, name, phone]
+      required: [id, createdAt, name, phone]
       properties:
         id: { type: string }
         createdAt: { type: string, format: date-time }
-        email: { type: string }
         name: { type: string }
         phone: { type: ["string", "null"] }
     SetupBody:
       type: object
-      required: [email, password, name]
+      required: [pin, name]
       properties:
-        email: { type: string }
-        password: { type: string, minLength: 8 }
+        pin: { type: string, pattern: "^[0-9]{4}$", description: "4-digit PIN" }
         name: { type: string, minLength: 1 }
     LoginCredentials:
       type: object
-      required: [email, password]
+      required: [pin]
       properties:
-        email: { type: string }
-        password: { type: string, minLength: 1 }
+        pin: { type: string, pattern: "^[0-9]{4}$", description: "4-digit PIN" }
     OwnerUpdate:
       type: object
       properties:
         name: { type: string, minLength: 1 }
-        email: { type: string }
         phone: { type: string }
-    ChangePasswordInput:
+    ChangePinInput:
       type: object
-      required: [currentPassword, newPassword]
+      required: [currentPin, newPin]
       properties:
-        currentPassword: { type: string, minLength: 1 }
-        newPassword: { type: string, minLength: 8 }
+        currentPin: { type: string, pattern: "^[0-9]{4}$" }
+        newPin: { type: string, pattern: "^[0-9]{4}$" }

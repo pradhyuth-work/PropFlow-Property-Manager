@@ -27,21 +27,18 @@ export const GetAuthStatusResponse = zod.object({
 /**
  * @summary Create the first (and only) owner account
  */
-export const setupOwnerBodyPasswordMin = 8;
-
+export const setupOwnerBodyPinRegExp = new RegExp('^[0-9]{4}$');
 
 
 
 export const SetupOwnerBody = zod.object({
-  "email": zod.string(),
-  "password": zod.string().min(setupOwnerBodyPasswordMin),
+  "pin": zod.string().regex(setupOwnerBodyPinRegExp).describe('4-digit PIN'),
   "name": zod.string().min(1)
 })
 
 export const SetupOwnerResponse = zod.object({
   "id": zod.string(),
   "createdAt": zod.coerce.date(),
-  "email": zod.string(),
   "name": zod.string(),
   "phone": zod.string().nullable()
 })
@@ -50,18 +47,16 @@ export const SetupOwnerResponse = zod.object({
 /**
  * @summary Log in as the owner
  */
-
+export const loginBodyPinRegExp = new RegExp('^[0-9]{4}$');
 
 
 export const LoginBody = zod.object({
-  "email": zod.string(),
-  "password": zod.string().min(1)
+  "pin": zod.string().regex(loginBodyPinRegExp).describe('4-digit PIN')
 })
 
 export const LoginResponse = zod.object({
   "id": zod.string(),
   "createdAt": zod.coerce.date(),
-  "email": zod.string(),
   "name": zod.string(),
   "phone": zod.string().nullable()
 })
@@ -79,7 +74,6 @@ export const LogoutResponse = zod.void()
 export const GetMeResponse = zod.object({
   "id": zod.string(),
   "createdAt": zod.coerce.date(),
-  "email": zod.string(),
   "name": zod.string(),
   "phone": zod.string().nullable()
 })
@@ -93,33 +87,30 @@ export const GetMeResponse = zod.object({
 
 export const UpdateMeBody = zod.object({
   "name": zod.string().min(1).optional(),
-  "email": zod.string().optional(),
   "phone": zod.string().optional()
 })
 
 export const UpdateMeResponse = zod.object({
   "id": zod.string(),
   "createdAt": zod.coerce.date(),
-  "email": zod.string(),
   "name": zod.string(),
   "phone": zod.string().nullable()
 })
 
 
 /**
- * @summary Change the owner's password
+ * @summary Change the owner's PIN
  */
+export const changePinBodyCurrentPinRegExp = new RegExp('^[0-9]{4}$');
+export const changePinBodyNewPinRegExp = new RegExp('^[0-9]{4}$');
 
-export const changePasswordBodyNewPasswordMin = 8;
 
-
-
-export const ChangePasswordBody = zod.object({
-  "currentPassword": zod.string().min(1),
-  "newPassword": zod.string().min(changePasswordBodyNewPasswordMin)
+export const ChangePinBody = zod.object({
+  "currentPin": zod.string().regex(changePinBodyCurrentPinRegExp),
+  "newPin": zod.string().regex(changePinBodyNewPinRegExp)
 })
 
-export const ChangePasswordResponse = zod.void()
+export const ChangePinResponse = zod.void()
 
 
 /**

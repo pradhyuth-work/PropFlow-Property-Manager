@@ -9,7 +9,6 @@
 export interface Owner {
   id: string;
   createdAt: Date;
-  email: string;
   name: string;
   /** @nullable */
   phone: string | null;

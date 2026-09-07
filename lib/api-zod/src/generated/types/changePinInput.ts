@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface ChangePasswordInput {
-  /** @minLength 1 */
-  currentPassword: string;
-  /** @minLength 8 */
-  newPassword: string;
+export interface ChangePinInput {
+  /** @pattern ^[0-9]{4}$ */
+  currentPin: string;
+  /** @pattern ^[0-9]{4}$ */
+  newPin: string;
 }

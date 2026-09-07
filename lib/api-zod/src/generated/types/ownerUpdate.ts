@@ -9,6 +9,5 @@
 export interface OwnerUpdate {
   /** @minLength 1 */
   name?: string;
-  email?: string;
   phone?: string;
 }

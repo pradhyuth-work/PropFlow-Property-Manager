@@ -7,9 +7,11 @@
  */
 
 export interface SetupBody {
-  email: string;
-  /** @minLength 8 */
-  password: string;
+  /**
+     * 4-digit PIN
+     * @pattern ^[0-9]{4}$
+     */
+  pin: string;
   /** @minLength 1 */
   name: string;
 }

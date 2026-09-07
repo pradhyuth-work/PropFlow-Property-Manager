@@ -22,7 +22,7 @@ import type {
 import type {
   Activity,
   AuthStatus,
-  ChangePasswordInput,
+  ChangePinInput,
   DashboardSummary,
   Flat,
   FlatInput,
@@ -582,25 +582,25 @@ export const useUpdateMe = <TError = ErrorType<unknown>,
       return useMutation(getUpdateMeMutationOptions(options));
     }
 
-export const getChangePasswordUrl = () => {
+export const getChangePinUrl = () => {
 
 
 
 
-  return `/api/auth/change-password`
+  return `/api/auth/change-pin`
 }
 
 /**
- * @summary Change the owner's password
+ * @summary Change the owner's PIN
  */
-export const changePassword = async (changePasswordInput: ChangePasswordInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+export const changePin = async (changePinInput: ChangePinInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
 
-  return customFetch<void>(getChangePasswordUrl(),
+  return customFetch<void>(getChangePinUrl(),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(changePasswordInput)
+    body: JSON.stringify(changePinInput)
   }
 );}
 
@@ -608,11 +608,11 @@ export const changePassword = async (changePasswordInput: ChangePasswordInput, o
 
 
 
-export const getChangePasswordMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<ChangePasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<ChangePasswordInput>}, TContext> => {
+export const getChangePinMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changePin>>, TError,{data: BodyType<ChangePinInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof changePin>>, TError,{data: BodyType<ChangePinInput>}, TContext> => {
 
-const mutationKey = ['changePassword'];
+const mutationKey = ['changePin'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -622,10 +622,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof changePassword>>, {data: BodyType<ChangePasswordInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof changePin>>, {data: BodyType<ChangePinInput>}> = (props) => {
           const {data} = props ?? {};
 
-          return  changePassword(data,requestOptions)
+          return  changePin(data,requestOptions)
         }
 
 
@@ -635,22 +635,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type ChangePasswordMutationResult = NonNullable<Awaited<ReturnType<typeof changePassword>>>
-    export type ChangePasswordMutationBody = BodyType<ChangePasswordInput>
-    export type ChangePasswordMutationError = ErrorType<unknown>
+    export type ChangePinMutationResult = NonNullable<Awaited<ReturnType<typeof changePin>>>
+    export type ChangePinMutationBody = BodyType<ChangePinInput>
+    export type ChangePinMutationError = ErrorType<unknown>
 
     /**
- * @summary Change the owner's password
+ * @summary Change the owner's PIN
  */
-export const useChangePassword = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changePassword>>, TError,{data: BodyType<ChangePasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useChangePin = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changePin>>, TError,{data: BodyType<ChangePinInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof changePassword>>,
+        Awaited<ReturnType<typeof changePin>>,
         TError,
-        {data: BodyType<ChangePasswordInput>},
+        {data: BodyType<ChangePinInput>},
         TContext
       > => {
-      return useMutation(getChangePasswordMutationOptions(options));
+      return useMutation(getChangePinMutationOptions(options));
     }
 
 export const getListPropertiesUrl = () => {

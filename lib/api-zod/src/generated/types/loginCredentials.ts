@@ -7,7 +7,9 @@
  */
 
 export interface LoginCredentials {
-  email: string;
-  /** @minLength 1 */
-  password: string;
+  /**
+     * 4-digit PIN
+     * @pattern ^[0-9]{4}$
+     */
+  pin: string;
 }

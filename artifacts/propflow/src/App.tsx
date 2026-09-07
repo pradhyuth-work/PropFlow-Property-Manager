@@ -12,7 +12,8 @@ import {
   getListFlatPaymentsQueryKey,
   getListFlatsQueryKey,
   getListPropertiesQueryKey,
-  useChangePassword,
+  ApiError,
+  useChangePin,
   useCreateFlat,
   useCreatePayment,
   useCreateProperty,
@@ -284,22 +285,22 @@ function AccountMenu({ open, onClose, onOpenProfile, onLogout, anchor }: { open:
 }
 
 function ProfileModal({ open, owner, onClose, onNotice }: { open: boolean; owner: Owner; onClose: () => void; onNotice: (notice: Notice) => void }) {
-  const [form, setForm] = useState({ name: owner.name, email: owner.email, phone: owner.phone ?? '' });
-  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '' });
+  const [form, setForm] = useState({ name: owner.name, phone: owner.phone ?? '' });
+  const [pinForm, setPinForm] = useState({ currentPin: '', newPin: '' });
   const queryClient = useQueryClient();
   const updateMe = useUpdateMe();
-  const changePassword = useChangePassword();
+  const changePin = useChangePin();
 
   useEffect(() => {
     if (open) {
-      setForm({ name: owner.name, email: owner.email, phone: owner.phone ?? '' });
-      setPasswordForm({ currentPassword: '', newPassword: '' });
+      setForm({ name: owner.name, phone: owner.phone ?? '' });
+      setPinForm({ currentPin: '', newPin: '' });
     }
   }, [open, owner]);
 
   const submitProfile = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    updateMe.mutate({ data: { name: form.name, email: form.email, phone: form.phone } }, {
+    updateMe.mutate({ data: { name: form.name, phone: form.phone } }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
         onNotice({ tone: 'success', text: 'Profile updated.' });
@@ -308,31 +309,35 @@ function ProfileModal({ open, owner, onClose, onNotice }: { open: boolean; owner
     });
   };
 
-  const submitPassword = (event: FormEvent<HTMLFormElement>) => {
+  const submitPin = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!passwordForm.currentPassword || !passwordForm.newPassword) return;
-    changePassword.mutate({ data: passwordForm }, {
+    if (!/^\d{4}$/.test(pinForm.currentPin) || !/^\d{4}$/.test(pinForm.newPin)) return;
+    changePin.mutate({ data: pinForm }, {
       onSuccess: () => {
-        setPasswordForm({ currentPassword: '', newPassword: '' });
-        onNotice({ tone: 'success', text: 'Password changed.' });
+        setPinForm({ currentPin: '', newPin: '' });
+        onNotice({ tone: 'success', text: 'PIN changed.' });
       },
-      onError: () => onNotice({ tone: 'error', text: 'Could not change your password. Check your current password.' }),
+      onError: (error) => onNotice({
+        tone: 'error',
+        text: error instanceof ApiError && typeof error.data === 'object' && error.data && 'error' in error.data
+          ? String((error.data as { error: unknown }).error)
+          : 'Could not change your PIN. Check your current PIN.',
+      }),
     });
   };
 
   return <Modal open={open} title="Profile settings" description="Update the owner details for this workspace." onClose={onClose}>
     <form onSubmit={submitProfile} className="space-y-4">
       <Field label="Name"><input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} data-testid="input-profile-name" className={inputClass()} /></Field>
-      <Field label="Email"><input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} data-testid="input-profile-email" className={inputClass()} /></Field>
       <Field label="Phone" hint="Optional"><input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} data-testid="input-profile-phone" className={inputClass()} placeholder="Optional" /></Field>
       <div className="flex justify-end pt-1"><button type="submit" disabled={updateMe.isPending} data-testid="button-save-profile" className="rounded-[8px] bg-[hsl(var(--primary))] px-4 py-2.5 text-[12px] font-bold text-[hsl(var(--primary-foreground))] disabled:opacity-50">{updateMe.isPending ? 'Saving...' : 'Save changes'}</button></div>
     </form>
     <div className="mt-8 border-t border-[hsl(var(--border))] pt-6">
-      <h3 className="text-[13px] font-bold">Change password</h3>
-      <form onSubmit={submitPassword} className="mt-4 space-y-4">
-        <Field label="Current password"><input required type="password" value={passwordForm.currentPassword} onChange={(event) => setPasswordForm({ ...passwordForm, currentPassword: event.target.value })} data-testid="input-current-password" className={inputClass()} /></Field>
-        <Field label="New password" hint="At least 8 characters"><input required minLength={8} type="password" value={passwordForm.newPassword} onChange={(event) => setPasswordForm({ ...passwordForm, newPassword: event.target.value })} data-testid="input-new-password" className={inputClass()} /></Field>
-        <div className="flex justify-end pt-1"><button type="submit" disabled={changePassword.isPending} data-testid="button-change-password" className="rounded-[8px] border border-[hsl(var(--border))] px-4 py-2.5 text-[12px] font-bold disabled:opacity-50">{changePassword.isPending ? 'Updating...' : 'Update password'}</button></div>
+      <h3 className="text-[13px] font-bold">Change PIN</h3>
+      <form onSubmit={submitPin} className="mt-4 space-y-4">
+        <Field label="Current PIN"><input required type="password" inputMode="numeric" pattern="\d{4}" maxLength={4} value={pinForm.currentPin} onChange={(event) => setPinForm({ ...pinForm, currentPin: event.target.value.replace(/\D/g, '').slice(0, 4) })} data-testid="input-current-pin" className={inputClass()} /></Field>
+        <Field label="New PIN" hint="4 digits"><input required type="password" inputMode="numeric" pattern="\d{4}" maxLength={4} value={pinForm.newPin} onChange={(event) => setPinForm({ ...pinForm, newPin: event.target.value.replace(/\D/g, '').slice(0, 4) })} data-testid="input-new-pin" className={inputClass()} /></Field>
+        <div className="flex justify-end pt-1"><button type="submit" disabled={changePin.isPending} data-testid="button-change-pin" className="rounded-[8px] border border-[hsl(var(--border))] px-4 py-2.5 text-[12px] font-bold disabled:opacity-50">{changePin.isPending ? 'Updating...' : 'Update PIN'}</button></div>
       </form>
     </div>
   </Modal>;
@@ -454,7 +459,7 @@ function AuthShell({ children }: { children: ReactNode }) {
 }
 
 function SetupScreen({ onDone }: { onDone: () => void }) {
-  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [form, setForm] = useState({ name: '', pin: '' });
   const [error, setError] = useState<string | null>(null);
   const setup = useSetupOwner();
 
@@ -470,11 +475,10 @@ function SetupScreen({ onDone }: { onDone: () => void }) {
   return <AuthShell>
     <Surface className="p-6 sm:p-8">
       <h1 className="display text-[22px] font-semibold tracking-[-.04em]">Set up your workspace</h1>
-      <p className="mt-1.5 text-[13px] leading-5 text-[hsl(var(--muted-foreground))]">Create the owner account for this PropFlow workspace. You'll use these details to log in from now on.</p>
+      <p className="mt-1.5 text-[13px] leading-5 text-[hsl(var(--muted-foreground))]">Create the owner account for this PropFlow workspace. You'll use this PIN to log in from now on.</p>
       <form onSubmit={submit} className="mt-6 space-y-4">
         <Field label="Your name"><input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} data-testid="input-setup-name" className={inputClass()} placeholder="Aarav Shah" /></Field>
-        <Field label="Email"><input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} data-testid="input-setup-email" className={inputClass()} placeholder="you@example.com" /></Field>
-        <Field label="Password" hint="At least 8 characters"><input required minLength={8} type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} data-testid="input-setup-password" className={inputClass()} placeholder="••••••••" /></Field>
+        <Field label="PIN" hint="4 digits"><input required type="password" inputMode="numeric" pattern="\d{4}" maxLength={4} value={form.pin} onChange={(event) => setForm({ ...form, pin: event.target.value.replace(/\D/g, '').slice(0, 4) })} data-testid="input-setup-pin" className={inputClass()} placeholder="••••" /></Field>
         {error && <p className="text-[12px] font-semibold text-[hsl(var(--destructive))]">{error}</p>}
         <button type="submit" disabled={setup.isPending} data-testid="button-submit-setup" className="w-full rounded-[9px] bg-[hsl(var(--primary))] py-2.5 text-[12px] font-bold text-[hsl(var(--primary-foreground))] disabled:opacity-50">{setup.isPending ? 'Creating account...' : 'Create account'}</button>
       </form>
@@ -483,26 +487,32 @@ function SetupScreen({ onDone }: { onDone: () => void }) {
 }
 
 function LoginScreen({ onDone }: { onDone: () => void }) {
-  const [form, setForm] = useState({ email: '', password: '' });
+  const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const login = useLogin();
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
-    login.mutate({ data: form }, {
+    login.mutate({ data: { pin } }, {
       onSuccess: onDone,
-      onError: () => setError('Incorrect email or password.'),
+      onError: (err) => {
+        setPin('');
+        setError(
+          err instanceof ApiError && typeof err.data === 'object' && err.data && 'error' in err.data
+            ? String((err.data as { error: unknown }).error)
+            : 'Incorrect PIN.',
+        );
+      },
     });
   };
 
   return <AuthShell>
     <Surface className="p-6 sm:p-8">
       <h1 className="display text-[22px] font-semibold tracking-[-.04em]">Welcome back</h1>
-      <p className="mt-1.5 text-[13px] leading-5 text-[hsl(var(--muted-foreground))]">Log in to your PropFlow workspace.</p>
+      <p className="mt-1.5 text-[13px] leading-5 text-[hsl(var(--muted-foreground))]">Enter your PIN to log in to your PropFlow workspace.</p>
       <form onSubmit={submit} className="mt-6 space-y-4">
-        <Field label="Email"><input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} data-testid="input-login-email" className={inputClass()} /></Field>
-        <Field label="Password"><input required type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} data-testid="input-login-password" className={inputClass()} /></Field>
+        <Field label="PIN"><input required autoFocus type="password" inputMode="numeric" pattern="\d{4}" maxLength={4} value={pin} onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 4))} data-testid="input-login-pin" className={inputClass()} /></Field>
         {error && <p className="text-[12px] font-semibold text-[hsl(var(--destructive))]">{error}</p>}
         <button type="submit" disabled={login.isPending} data-testid="button-submit-login" className="w-full rounded-[9px] bg-[hsl(var(--primary))] py-2.5 text-[12px] font-bold text-[hsl(var(--primary-foreground))] disabled:opacity-50">{login.isPending ? 'Logging in...' : 'Log in'}</button>
       </form>

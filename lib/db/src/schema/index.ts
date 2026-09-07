@@ -1,14 +1,18 @@
 import { createInsertSchema } from "drizzle-zod";
-import { pgTable, text, timestamp, uuid, date, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, date, numeric, integer } from "drizzle-orm/pg-core";
 
 export const owners = pgTable("owners", {
   id: uuid("id").defaultRandom().primaryKey(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  email: text("email").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
+  pinHash: text("pin_hash").notNull(),
   name: text("name").notNull(),
   phone: text("phone"),
+  // A 4-digit PIN only has 10,000 possible values, so failed logins are
+  // counted and the account is briefly locked out to make brute-forcing it
+  // impractical over the network.
+  failedPinAttempts: integer("failed_pin_attempts").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
 });
 
 export const properties = pgTable("properties", {
