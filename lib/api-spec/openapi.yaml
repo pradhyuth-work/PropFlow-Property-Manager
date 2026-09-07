@@ -9,6 +9,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Owner authentication and profile
   - name: properties
     description: Property management
   - name: flats
@@ -30,6 +32,105 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/status:
+    get:
+      operationId: getAuthStatus
+      tags: [auth]
+      summary: Check whether an owner account exists yet
+      responses:
+        "200":
+          description: Auth status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthStatus"
+  /auth/setup:
+    post:
+      operationId: setupOwner
+      tags: [auth]
+      summary: Create the first (and only) owner account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetupBody"
+      responses:
+        "201":
+          description: Owner created and logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Owner"
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Log in as the owner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginCredentials"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Owner"
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Log out
+      responses:
+        "204":
+          description: Logged out
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get the current owner's profile
+      responses:
+        "200":
+          description: Owner profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Owner"
+    patch:
+      operationId: updateMe
+      tags: [auth]
+      summary: Update the current owner's profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnerUpdate"
+      responses:
+        "200":
+          description: Updated owner profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Owner"
+  /auth/change-password:
+    post:
+      operationId: changePassword
+      tags: [auth]
+      summary: Change the owner's password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordInput"
+      responses:
+        "204":
+          description: Password changed
   /properties:
     get:
       operationId: listProperties
@@ -325,3 +426,42 @@ components:
         title: { type: string }
         description: { type: string }
         createdAt: { type: string, format: date-time }
+    AuthStatus:
+      type: object
+      required: [hasOwner]
+      properties:
+        hasOwner: { type: boolean }
+    Owner:
+      type: object
+      required: [id, createdAt, email, name, phone]
+      properties:
+        id: { type: string }
+        createdAt: { type: string, format: date-time }
+        email: { type: string }
+        name: { type: string }
+        phone: { type: ["string", "null"] }
+    SetupBody:
+      type: object
+      required: [email, password, name]
+      properties:
+        email: { type: string }
+        password: { type: string, minLength: 8 }
+        name: { type: string, minLength: 1 }
+    LoginCredentials:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string, minLength: 1 }
+    OwnerUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        email: { type: string }
+        phone: { type: string }
+    ChangePasswordInput:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string, minLength: 1 }
+        newPassword: { type: string, minLength: 8 }

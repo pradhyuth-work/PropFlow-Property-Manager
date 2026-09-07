@@ -1,29 +1,39 @@
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
-import { Activity, ArrowDownRight, ArrowUpRight, Building2, Check, ChevronRight, CircleDollarSign, ClipboardList, Home, LayoutDashboard, Menu, MoreHorizontal, Pencil, Plus, ReceiptIndianRupee, Search, Settings2, Sparkles, Trash2, WalletCards, X } from 'lucide-react';
+import { Activity, ArrowDownRight, ArrowUpRight, Building2, Check, ChevronRight, CircleDollarSign, ClipboardList, Home, LayoutDashboard, LogOut, Menu, MoreHorizontal, Pencil, Plus, ReceiptIndianRupee, Search, Sparkles, Trash2, UserCog, WalletCards, X } from 'lucide-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { EmptyState, Field, formatDate, formatMoney, Modal, SectionTitle, SkeletonRows, Surface, inputClass } from '@/components/propflow-ui';
 import NotFound from '@/pages/not-found';
 import {
+  getGetAuthStatusQueryKey,
   getGetDashboardSummaryQueryKey,
+  getGetMeQueryKey,
   getListActivityQueryKey,
   getListFlatPaymentsQueryKey,
   getListFlatsQueryKey,
   getListPropertiesQueryKey,
+  useChangePassword,
   useCreateFlat,
   useCreatePayment,
   useCreateProperty,
   useDeleteFlat,
   useDeleteProperty,
+  useGetAuthStatus,
   useGetDashboardSummary,
+  useGetMe,
   useHealthCheck,
   useListActivity,
   useListFlatPayments,
   useListFlats,
   useListProperties,
+  useLogin,
+  useLogout,
+  useSetupOwner,
   useUpdateFlat,
+  useUpdateMe,
   useUpdateProperty,
   type Flat,
+  type Owner,
   type Property,
 } from '@workspace/api-client-react';
 import { Toaster } from '@/components/ui/toaster';
@@ -40,13 +50,16 @@ const navItems: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'ledger', label: 'Rent ledger', icon: ReceiptIndianRupee },
 ];
 
-function AppShell() {
+function AppShell({ owner }: { owner: Owner }) {
   const [view, setView] = useState<View>('overview');
   const [mobileNav, setMobileNav] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [propertyModal, setPropertyModal] = useState(false);
   const [flatModal, setFlatModal] = useState(false);
   const [paymentModal, setPaymentModal] = useState(false);
+  const [profileModal, setProfileModal] = useState(false);
+  const [sidebarMenuOpen, setSidebarMenuOpen] = useState(false);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [editingFlat, setEditingFlat] = useState<Flat | null>(null);
   const [selectedFlat, setSelectedFlat] = useState<Flat | null>(null);
@@ -72,6 +85,7 @@ function AppShell() {
   const updateFlat = useUpdateFlat();
   const deleteFlat = useDeleteFlat();
   const createPayment = useCreatePayment();
+  const logout = useLogout();
 
   const properties = propertiesQuery.data ?? [];
   const flats = flatsQuery.data ?? [];
@@ -204,6 +218,22 @@ function AppShell() {
     activityQuery.refetch();
   };
 
+  const doLogout = () => {
+    logout.mutate(undefined, {
+      onSuccess: () => {
+        queryClient.clear();
+      },
+    });
+  };
+
+  const ownerInitials = owner.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || 'PF';
+  const firstName = owner.name.trim().split(/\s+/)[0] ?? owner.name;
+  const now = new Date();
+  const hour = now.getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const todayLabel = new Intl.DateTimeFormat('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(now);
+  const monthYearLabel = `${now.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()} / ${now.getFullYear()}`;
+
   return (
     <div className="noise flex min-h-[100dvh] bg-[hsl(var(--background))]">
       <aside className={`fixed inset-y-0 left-0 z-30 flex w-[270px] flex-col border-r border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar))] px-5 py-6 transition-transform duration-300 md:static md:translate-x-0 ${mobileNav ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -216,16 +246,16 @@ function AppShell() {
             {navItems.map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => { setView(id); setMobileNav(false); }} data-testid={`button-nav-${id}`} className={`group flex w-full items-center gap-3 rounded-[9px] px-3 py-2.5 text-left text-[13px] font-semibold transition-colors ${view === id ? 'bg-[hsl(var(--sidebar-accent))] text-[hsl(var(--sidebar-foreground))]' : 'text-[hsl(var(--sidebar-foreground)/.62)] hover:bg-[hsl(var(--sidebar-accent)/.65)] hover:text-[hsl(var(--sidebar-foreground))]'}`}><Icon size={17} className={view === id ? 'text-[hsl(var(--sidebar-primary))]' : ''} /><span>{label}</span>{id === 'ledger' && summary?.dueForRevision ? <span className="mono ml-auto rounded-full bg-[hsl(var(--accent))] px-1.5 py-0.5 text-[9px] font-medium text-[hsl(var(--accent-foreground))]">{summary.dueForRevision}</span> : null}</button>)}
           </nav>
         </div>
-        <div className="mt-auto space-y-1 px-1">
-          <button type="button" onClick={() => setNotice({ tone: 'success', text: 'Workspace settings are coming next.' })} data-testid="button-settings" className="flex w-full items-center gap-3 rounded-[9px] px-3 py-2.5 text-[13px] font-semibold text-[hsl(var(--sidebar-foreground)/.62)] transition-colors hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))]"><Settings2 size={17} />Settings</button>
-          <div className="mt-3 flex items-center gap-3 rounded-[11px] border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-accent)/.5)] p-3"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[hsl(var(--accent))] text-[11px] font-bold text-[hsl(var(--accent-foreground))]">AS</div><div className="min-w-0"><p className="truncate text-[12px] font-semibold text-[hsl(var(--sidebar-foreground))]">Aarav Shah</p><p className="truncate text-[10px] text-[hsl(var(--sidebar-foreground)/.48)]">Portfolio owner</p></div><MoreHorizontal size={15} className="ml-auto text-[hsl(var(--sidebar-foreground)/.42)]" /></div>
+        <div className="relative mt-auto px-1">
+          <button type="button" onClick={() => setSidebarMenuOpen((open) => !open)} data-testid="button-sidebar-account-menu" className="flex w-full items-center gap-3 rounded-[11px] border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-accent)/.5)] p-3 text-left transition-colors hover:bg-[hsl(var(--sidebar-accent))]"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[hsl(var(--accent))] text-[11px] font-bold text-[hsl(var(--accent-foreground))]">{ownerInitials}</div><div className="min-w-0"><p className="truncate text-[12px] font-semibold text-[hsl(var(--sidebar-foreground))]">{owner.name}</p><p className="truncate text-[10px] text-[hsl(var(--sidebar-foreground)/.48)]">Portfolio owner</p></div><MoreHorizontal size={15} className="ml-auto shrink-0 text-[hsl(var(--sidebar-foreground)/.42)]" /></button>
+          <AccountMenu open={sidebarMenuOpen} onClose={() => setSidebarMenuOpen(false)} onOpenProfile={() => setProfileModal(true)} onLogout={doLogout} anchor="bottom" />
         </div>
       </aside>
       {mobileNav && <button type="button" aria-label="Close navigation" data-testid="button-close-navigation" onClick={() => setMobileNav(false)} className="fixed inset-0 z-20 bg-[hsl(var(--foreground)/.35)] md:hidden" />}
       <main className="min-w-0 flex-1">
         <header className="sticky top-0 z-10 flex h-[70px] items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.9)] px-5 backdrop-blur-md sm:px-8">
-          <div className="flex items-center gap-3"><button type="button" onClick={() => setMobileNav(true)} data-testid="button-open-navigation" className="rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] md:hidden"><Menu size={19} /></button><div><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--muted-foreground))]">Tuesday, 18 June 2024</p><h1 className="display mt-0.5 text-[18px] font-semibold tracking-[-.035em]">{view === 'overview' ? 'Good morning, Aarav' : 'Rent ledger'}</h1></div></div>
-          <div className="flex items-center gap-3"><div className="hidden items-center gap-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card)/.6)] px-3 py-1.5 sm:flex"><span className={`h-1.5 w-1.5 rounded-full ${health.isError ? 'bg-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary))]'}`} /><span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{health.isError ? 'offline' : 'live sync'}</span></div><button type="button" onClick={() => openCreateProperty()} data-testid="button-header-add-property" className="hidden items-center gap-2 rounded-[9px] bg-[hsl(var(--primary))] px-3 py-2 text-[12px] font-bold text-[hsl(var(--primary-foreground))] shadow-sm transition-transform hover:-translate-y-0.5 sm:flex"><Plus size={15} />Add property</button><div className="flex h-8 w-8 items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[11px] font-bold text-[hsl(var(--foreground))]">AS</div></div>
+          <div className="flex items-center gap-3"><button type="button" onClick={() => setMobileNav(true)} data-testid="button-open-navigation" className="rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] md:hidden"><Menu size={19} /></button><div><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--muted-foreground))]">{todayLabel}</p><h1 className="display mt-0.5 text-[18px] font-semibold tracking-[-.035em]">{view === 'overview' ? `${greeting}, ${firstName}` : 'Rent ledger'}</h1></div></div>
+          <div className="flex items-center gap-3"><div className="hidden items-center gap-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card)/.6)] px-3 py-1.5 sm:flex"><span className={`h-1.5 w-1.5 rounded-full ${health.isError ? 'bg-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary))]'}`} /><span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{health.isError ? 'offline' : 'live sync'}</span></div><button type="button" onClick={() => openCreateProperty()} data-testid="button-header-add-property" className="hidden items-center gap-2 rounded-[9px] bg-[hsl(var(--primary))] px-3 py-2 text-[12px] font-bold text-[hsl(var(--primary-foreground))] shadow-sm transition-transform hover:-translate-y-0.5 sm:flex"><Plus size={15} />Add property</button><div className="relative"><button type="button" onClick={() => setHeaderMenuOpen((open) => !open)} data-testid="button-header-account-menu" className="flex h-8 w-8 items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[11px] font-bold text-[hsl(var(--foreground))] transition-colors hover:border-[hsl(var(--primary))]">{ownerInitials}</button><AccountMenu open={headerMenuOpen} onClose={() => setHeaderMenuOpen(false)} onOpenProfile={() => setProfileModal(true)} onLogout={doLogout} anchor="top-right" /></div></div>
         </header>
         <div className="workspace-grid mx-auto min-h-[calc(100dvh-70px)] max-w-[1600px] px-5 py-8 sm:px-8 lg:px-12">
           {notice && <div data-testid="status-notice" className={`animate-rise-in mb-5 flex items-center gap-2 rounded-[10px] border px-3.5 py-2.5 text-[12px] font-semibold ${notice.tone === 'success' ? 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--destructive)/.3)] bg-[hsl(var(--destructive)/.1)] text-[hsl(var(--destructive))]'}`}><span className={`flex h-5 w-5 items-center justify-center rounded-full ${notice.tone === 'success' ? 'bg-[hsl(var(--primary))]' : 'bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]'}`}>{notice.tone === 'success' ? <Check size={13} /> : <X size={13} />}</span>{notice.text}<button type="button" data-testid="button-dismiss-notice" onClick={() => setNotice(null)} className="ml-auto opacity-60 hover:opacity-100"><X size={14} /></button></div>}
@@ -235,9 +265,77 @@ function AppShell() {
       <PropertyModal open={propertyModal} editing={editingProperty} form={propertyForm} setForm={setPropertyForm} onClose={() => setPropertyModal(false)} onSubmit={submitProperty} pending={createProperty.isPending || updateProperty.isPending} />
       <FlatModal open={flatModal} editing={editingFlat} form={flatForm} setForm={setFlatForm} properties={properties} onClose={() => setFlatModal(false)} onSubmit={submitFlat} pending={createFlat.isPending || updateFlat.isPending} />
       <PaymentModal open={paymentModal} flat={selectedFlat} form={paymentForm} setForm={setPaymentForm} onClose={() => setPaymentModal(false)} onSubmit={submitPayment} pending={createPayment.isPending} />
+      <ProfileModal open={profileModal} owner={owner} onClose={() => setProfileModal(false)} onNotice={setNotice} />
       {selectedFlat && <FlatDetail flat={selectedFlat} payments={paymentsQuery.data ?? []} loading={paymentsQuery.isLoading} onClose={() => setSelectedFlat(null)} onEdit={() => openEditFlat(selectedFlat)} onRecordPayment={() => openPayment(selectedFlat)} />}
     </div>
   );
+}
+
+function AccountMenu({ open, onClose, onOpenProfile, onLogout, anchor }: { open: boolean; onClose: () => void; onOpenProfile: () => void; onLogout: () => void; anchor: 'bottom' | 'top-right' }) {
+  if (!open) return null;
+  const position = anchor === 'bottom' ? 'bottom-full left-0 mb-2' : 'right-0 top-full mt-2';
+  return <>
+    <button type="button" aria-label="Close menu" onClick={onClose} className="fixed inset-0 z-40 cursor-default" />
+    <div className={`absolute z-50 w-[200px] overflow-hidden rounded-[10px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] py-1.5 shadow-[var(--shadow-md)] ${position}`}>
+      <button type="button" onClick={() => { onOpenProfile(); onClose(); }} data-testid="button-open-profile-settings" className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[12px] font-semibold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))]"><UserCog size={14} />Profile settings</button>
+      <button type="button" onClick={() => { onLogout(); onClose(); }} data-testid="button-logout" className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[12px] font-semibold text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/.08)]"><LogOut size={14} />Log out</button>
+    </div>
+  </>;
+}
+
+function ProfileModal({ open, owner, onClose, onNotice }: { open: boolean; owner: Owner; onClose: () => void; onNotice: (notice: Notice) => void }) {
+  const [form, setForm] = useState({ name: owner.name, email: owner.email, phone: owner.phone ?? '' });
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '' });
+  const queryClient = useQueryClient();
+  const updateMe = useUpdateMe();
+  const changePassword = useChangePassword();
+
+  useEffect(() => {
+    if (open) {
+      setForm({ name: owner.name, email: owner.email, phone: owner.phone ?? '' });
+      setPasswordForm({ currentPassword: '', newPassword: '' });
+    }
+  }, [open, owner]);
+
+  const submitProfile = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    updateMe.mutate({ data: { name: form.name, email: form.email, phone: form.phone } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+        onNotice({ tone: 'success', text: 'Profile updated.' });
+      },
+      onError: () => onNotice({ tone: 'error', text: 'Could not update your profile.' }),
+    });
+  };
+
+  const submitPassword = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!passwordForm.currentPassword || !passwordForm.newPassword) return;
+    changePassword.mutate({ data: passwordForm }, {
+      onSuccess: () => {
+        setPasswordForm({ currentPassword: '', newPassword: '' });
+        onNotice({ tone: 'success', text: 'Password changed.' });
+      },
+      onError: () => onNotice({ tone: 'error', text: 'Could not change your password. Check your current password.' }),
+    });
+  };
+
+  return <Modal open={open} title="Profile settings" description="Update the owner details for this workspace." onClose={onClose}>
+    <form onSubmit={submitProfile} className="space-y-4">
+      <Field label="Name"><input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} data-testid="input-profile-name" className={inputClass()} /></Field>
+      <Field label="Email"><input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} data-testid="input-profile-email" className={inputClass()} /></Field>
+      <Field label="Phone" hint="Optional"><input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} data-testid="input-profile-phone" className={inputClass()} placeholder="Optional" /></Field>
+      <div className="flex justify-end pt-1"><button type="submit" disabled={updateMe.isPending} data-testid="button-save-profile" className="rounded-[8px] bg-[hsl(var(--primary))] px-4 py-2.5 text-[12px] font-bold text-[hsl(var(--primary-foreground))] disabled:opacity-50">{updateMe.isPending ? 'Saving...' : 'Save changes'}</button></div>
+    </form>
+    <div className="mt-8 border-t border-[hsl(var(--border))] pt-6">
+      <h3 className="text-[13px] font-bold">Change password</h3>
+      <form onSubmit={submitPassword} className="mt-4 space-y-4">
+        <Field label="Current password"><input required type="password" value={passwordForm.currentPassword} onChange={(event) => setPasswordForm({ ...passwordForm, currentPassword: event.target.value })} data-testid="input-current-password" className={inputClass()} /></Field>
+        <Field label="New password" hint="At least 8 characters"><input required minLength={8} type="password" value={passwordForm.newPassword} onChange={(event) => setPasswordForm({ ...passwordForm, newPassword: event.target.value })} data-testid="input-new-password" className={inputClass()} /></Field>
+        <div className="flex justify-end pt-1"><button type="submit" disabled={changePassword.isPending} data-testid="button-change-password" className="rounded-[8px] border border-[hsl(var(--border))] px-4 py-2.5 text-[12px] font-bold disabled:opacity-50">{changePassword.isPending ? 'Updating...' : 'Update password'}</button></div>
+      </form>
+    </div>
+  </Modal>;
 }
 
 function ErrorState({ onRetry }: { onRetry: () => void }) {
@@ -254,6 +352,7 @@ function Metric({ label, value, detail, icon: Icon, accent, trend }: { label: st
 
 function Overview({ properties, flats, summary, activities, onAddProperty, onEditProperty, onDeleteProperty, onAddFlat, onSelectFlat }: { properties: Property[]; flats: Flat[]; summary?: { expectedMonthlyRevenue: number; totalCollected: number; occupiedUnits: number; totalUnits: number; propertiesCount: number; dueForRevision: number }; activities: { id: string; type: string; title: string; description: string; createdAt: string }[]; onAddProperty: () => void; onEditProperty: (property: Property) => void; onDeleteProperty: (property: Property) => void; onAddFlat: (propertyId?: string) => void; onSelectFlat: (flat: Flat) => void }) {
   const occupancy = summary && summary.totalUnits ? Math.round((summary.occupiedUnits / summary.totalUnits) * 100) : 0;
+  const monthYearLabel = `${new Date().toLocaleDateString('en-US', { month: 'short' }).toUpperCase()} / ${new Date().getFullYear()}`;
   return <div className="animate-rise-in space-y-8">
     <section className="relative overflow-hidden rounded-[24px] border border-[hsl(var(--border))] bg-[linear-gradient(120deg,hsl(var(--sidebar))_0%,hsl(231_29%_13%)_58%,hsl(240_35%_18%)_100%)] p-6 shadow-[var(--shadow-md)] sm:p-8">
       <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full border border-[hsl(var(--primary)/.2)] bg-[hsl(var(--primary)/.08)] blur-[1px]" />
@@ -271,7 +370,7 @@ function Overview({ properties, flats, summary, activities, onAddProperty, onEdi
         </div>
       </div>
     </section>
-    <section><div className="mb-4 flex items-end justify-between"><div><p className="mono mb-1 text-[10px] uppercase tracking-[.18em] text-[hsl(var(--muted-foreground))]">Portfolio pulse</p><h2 className="display text-[21px] font-semibold tracking-[-.045em]">Your numbers, at a glance.</h2></div><p className="hidden text-right text-[12px] text-[hsl(var(--muted-foreground))] sm:block">Updated moments ago<br /><span className="mono text-[10px]">JUN / 2024</span></p></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Expected this month" value={formatMoney(summary?.expectedMonthlyRevenue)} detail="across active leases" icon={WalletCards} accent="bg-[hsl(var(--primary))]" trend="up" /><Metric label="Collected this month" value={formatMoney(summary?.totalCollected)} detail={`${summary?.expectedMonthlyRevenue ? Math.round((summary.totalCollected / summary.expectedMonthlyRevenue) * 100) : 0}% of expected`} icon={CircleDollarSign} accent="bg-[hsl(var(--accent))]" trend="up" /><Metric label="Occupied units" value={`${summary?.occupiedUnits ?? 0} / ${summary?.totalUnits ?? 0}`} detail={`${occupancy}% portfolio occupancy`} icon={Home} accent="bg-[hsl(var(--chart-3))]" /><Metric label="Needs attention" value={String(summary?.dueForRevision ?? 0).padStart(2, '0')} detail="leases due for revision" icon={ClipboardList} accent="bg-[hsl(var(--chart-4))]" trend={summary?.dueForRevision ? 'down' : undefined} /></div></section>
+    <section><div className="mb-4 flex items-end justify-between"><div><p className="mono mb-1 text-[10px] uppercase tracking-[.18em] text-[hsl(var(--muted-foreground))]">Portfolio pulse</p><h2 className="display text-[21px] font-semibold tracking-[-.045em]">Your numbers, at a glance.</h2></div><p className="hidden text-right text-[12px] text-[hsl(var(--muted-foreground))] sm:block">Updated moments ago<br /><span className="mono text-[10px]">{monthYearLabel}</span></p></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Expected this month" value={formatMoney(summary?.expectedMonthlyRevenue)} detail="across active leases" icon={WalletCards} accent="bg-[hsl(var(--primary))]" trend="up" /><Metric label="Collected this month" value={formatMoney(summary?.totalCollected)} detail={`${summary?.expectedMonthlyRevenue ? Math.round((summary.totalCollected / summary.expectedMonthlyRevenue) * 100) : 0}% of expected`} icon={CircleDollarSign} accent="bg-[hsl(var(--accent))]" trend="up" /><Metric label="Occupied units" value={`${summary?.occupiedUnits ?? 0} / ${summary?.totalUnits ?? 0}`} detail={`${occupancy}% portfolio occupancy`} icon={Home} accent="bg-[hsl(var(--chart-3))]" /><Metric label="Needs attention" value={String(summary?.dueForRevision ?? 0).padStart(2, '0')} detail="leases due for revision" icon={ClipboardList} accent="bg-[hsl(var(--chart-4))]" trend={summary?.dueForRevision ? 'down' : undefined} /></div></section>
     <section className="grid gap-5 lg:grid-cols-[1.25fr_.75fr]">
       <Surface className="p-5 sm:p-6"><SectionTitle eyebrow="Setup / 01" title="Make your workspace useful" aside={<Sparkles size={18} className="text-[hsl(var(--primary))]" />} /><p className="mb-6 max-w-[500px] text-[13px] leading-5 text-[hsl(var(--muted-foreground))]">Start with the places you manage, then add the people and leases inside them. PropFlow will keep the operational detail close at hand.</p><div className="space-y-2.5">{[{ done: properties.length > 0, title: 'Add your first property', description: properties.length ? `${properties.length} location${properties.length === 1 ? '' : 's'} in your portfolio` : 'Create a home base for your units', action: onAddProperty }, { done: flats.length > 0, title: 'Add units & tenants', description: flats.length ? `${flats.length} active unit${flats.length === 1 ? '' : 's'} being tracked` : 'Bring your lease details into one view', action: () => onAddFlat() }, { done: flats.some((flat) => flat.lastPaymentDate), title: 'Record a payment', description: flats.some((flat) => flat.lastPaymentDate) ? 'Your ledger has a payment trail' : 'Close the loop on your first rent', action: () => flats[0] && onSelectFlat(flats[0]) }].map((item, index) => <button type="button" key={item.title} onClick={item.action} data-testid={`button-setup-${index}`} className="group flex w-full items-center gap-3 rounded-[10px] border border-[hsl(var(--border))] bg-[hsl(var(--background)/.45)] p-3 text-left transition-colors hover:border-[hsl(var(--primary)/.55)] hover:bg-[hsl(var(--primary)/.05)]"><span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold ${item.done ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]'}`}>{item.done ? <Check size={14} /> : `0${index + 1}`}</span><span className="min-w-0 flex-1"><span className="block text-[12px] font-bold">{item.title}</span><span className="mt-0.5 block truncate text-[11px] text-[hsl(var(--muted-foreground))]">{item.description}</span></span><ChevronRight size={16} className="text-[hsl(var(--muted-foreground))] transition-transform group-hover:translate-x-0.5" /></button>)}</div></Surface>
       <ActivityPanel activities={activities} />
@@ -314,9 +413,106 @@ function PaymentModal({ open, flat, form, setForm, onClose, onSubmit, pending }:
   return <Modal open={open} title="Record a payment" description={flat ? `${flat.tenantName} · ${flat.flatNo}` : undefined} onClose={onClose}><form onSubmit={onSubmit} className="space-y-4"><Field label="Amount received"><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[hsl(var(--muted-foreground))]">₹</span><input required min="0" type="number" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} data-testid="input-payment-amount" className={`${inputClass()} pl-8`} /></div></Field><Field label="Payment date"><input required type="date" value={form.paymentDate} onChange={(event) => setForm({ ...form, paymentDate: event.target.value })} data-testid="input-payment-date" className={inputClass()} /></Field><div className="rounded-[9px] bg-[hsl(var(--primary)/.1)] p-3 text-[11px] leading-5 text-[hsl(var(--primary-foreground))]">This payment will be added to the unit's history and reflected in your portfolio totals.</div><div className="flex justify-end gap-2 pt-3"><button type="button" onClick={onClose} data-testid="button-cancel-payment" className="rounded-[8px] px-3.5 py-2.5 text-[12px] font-semibold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]">Cancel</button><button type="submit" disabled={pending} data-testid="button-submit-payment" className="rounded-[8px] bg-[hsl(var(--primary))] px-4 py-2.5 text-[12px] font-bold text-[hsl(var(--primary-foreground))] disabled:opacity-50">{pending ? 'Recording...' : 'Record payment'}</button></div></form></Modal>;
 }
 
+function AuthGate() {
+  const queryClient = useQueryClient();
+  const statusQuery = useGetAuthStatus();
+  const meQuery = useGetMe({
+    query: { enabled: statusQuery.data?.hasOwner === true, retry: false, queryKey: getGetMeQueryKey() },
+  });
+
+  if (statusQuery.isLoading) return <AuthShell><SkeletonRows rows={3} /></AuthShell>;
+  if (statusQuery.isError) return <AuthShell><ErrorState onRetry={() => statusQuery.refetch()} /></AuthShell>;
+
+  if (statusQuery.data?.hasOwner !== true) {
+    return <SetupScreen onDone={() => {
+      queryClient.invalidateQueries({ queryKey: getGetAuthStatusQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+    }} />;
+  }
+
+  if (meQuery.isLoading) return <AuthShell><SkeletonRows rows={3} /></AuthShell>;
+
+  if (meQuery.isError || !meQuery.data) {
+    return <LoginScreen onDone={() => queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() })} />;
+  }
+
+  return <AppShell owner={meQuery.data} />;
+}
+
+function AuthShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="noise flex min-h-[100dvh] items-center justify-center bg-[hsl(var(--background))] px-5">
+      <div className="w-full max-w-[400px]">
+        <div className="mb-8 flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"><Building2 size={19} strokeWidth={2.5} /></div>
+          <div><p className="display text-[18px] font-bold tracking-[-.06em]">PropFlow</p><p className="mono text-[9px] uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">operator workspace</p></div>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function SetupScreen({ onDone }: { onDone: () => void }) {
+  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [error, setError] = useState<string | null>(null);
+  const setup = useSetupOwner();
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setup.mutate({ data: form }, {
+      onSuccess: onDone,
+      onError: () => setError('Could not create your account. Please try again.'),
+    });
+  };
+
+  return <AuthShell>
+    <Surface className="p-6 sm:p-8">
+      <h1 className="display text-[22px] font-semibold tracking-[-.04em]">Set up your workspace</h1>
+      <p className="mt-1.5 text-[13px] leading-5 text-[hsl(var(--muted-foreground))]">Create the owner account for this PropFlow workspace. You'll use these details to log in from now on.</p>
+      <form onSubmit={submit} className="mt-6 space-y-4">
+        <Field label="Your name"><input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} data-testid="input-setup-name" className={inputClass()} placeholder="Aarav Shah" /></Field>
+        <Field label="Email"><input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} data-testid="input-setup-email" className={inputClass()} placeholder="you@example.com" /></Field>
+        <Field label="Password" hint="At least 8 characters"><input required minLength={8} type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} data-testid="input-setup-password" className={inputClass()} placeholder="••••••••" /></Field>
+        {error && <p className="text-[12px] font-semibold text-[hsl(var(--destructive))]">{error}</p>}
+        <button type="submit" disabled={setup.isPending} data-testid="button-submit-setup" className="w-full rounded-[9px] bg-[hsl(var(--primary))] py-2.5 text-[12px] font-bold text-[hsl(var(--primary-foreground))] disabled:opacity-50">{setup.isPending ? 'Creating account...' : 'Create account'}</button>
+      </form>
+    </Surface>
+  </AuthShell>;
+}
+
+function LoginScreen({ onDone }: { onDone: () => void }) {
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [error, setError] = useState<string | null>(null);
+  const login = useLogin();
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    login.mutate({ data: form }, {
+      onSuccess: onDone,
+      onError: () => setError('Incorrect email or password.'),
+    });
+  };
+
+  return <AuthShell>
+    <Surface className="p-6 sm:p-8">
+      <h1 className="display text-[22px] font-semibold tracking-[-.04em]">Welcome back</h1>
+      <p className="mt-1.5 text-[13px] leading-5 text-[hsl(var(--muted-foreground))]">Log in to your PropFlow workspace.</p>
+      <form onSubmit={submit} className="mt-6 space-y-4">
+        <Field label="Email"><input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} data-testid="input-login-email" className={inputClass()} /></Field>
+        <Field label="Password"><input required type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} data-testid="input-login-password" className={inputClass()} /></Field>
+        {error && <p className="text-[12px] font-semibold text-[hsl(var(--destructive))]">{error}</p>}
+        <button type="submit" disabled={login.isPending} data-testid="button-submit-login" className="w-full rounded-[9px] bg-[hsl(var(--primary))] py-2.5 text-[12px] font-bold text-[hsl(var(--primary-foreground))] disabled:opacity-50">{login.isPending ? 'Logging in...' : 'Log in'}</button>
+      </form>
+    </Surface>
+  </AuthShell>;
+}
+
 function Router() {
   const [location] = useLocation();
-  return <ErrorBoundary resetKey={location}><Switch><Route path="/" component={AppShell} /><Route component={NotFound} /></Switch></ErrorBoundary>;
+  return <ErrorBoundary resetKey={location}><Switch><Route path="/" component={AuthGate} /><Route component={NotFound} /></Switch></ErrorBoundary>;
 }
 
 function App() {

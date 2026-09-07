@@ -33,7 +33,8 @@ const isoTimestamp = (value: Date | string) => new Date(value).toISOString();
 router.get("/properties", async (_req, res, next) => {
   try {
     const result = await pool.query(`SELECT p.*, COUNT(f.id)::int AS unit_count
-      FROM properties p LEFT JOIN flats f ON f.property_id = p.id
+      FROM properties p LEFT JOIN flats f ON f.property_id = p.id AND f.deleted_at IS NULL
+      WHERE p.deleted_at IS NULL
       GROUP BY p.id ORDER BY p.created_at DESC`);
     res.json(ListPropertiesResponse.parse(result.rows.map((row) => ({
       id: row.id, createdAt: isoTimestamp(row.created_at), name: row.name,
@@ -61,7 +62,7 @@ router.patch("/properties/:id", async (req, res, next) => {
     const { id } = UpdatePropertyParams.parse(req.params);
     const input = UpdatePropertyBody.parse(req.body);
     const result = await pool.query(
-      "UPDATE properties SET name = COALESCE($1, name), address = COALESCE($2, address) WHERE id = $3 RETURNING *",
+      "UPDATE properties SET name = COALESCE($1, name), address = COALESCE($2, address) WHERE id = $3 AND deleted_at IS NULL RETURNING *",
       [input.name ?? null, input.address ?? null, id],
     );
     if (!result.rowCount) return res.status(404).json({ error: "Property not found" });
@@ -75,7 +76,19 @@ router.patch("/properties/:id", async (req, res, next) => {
 router.delete("/properties/:id", async (req, res, next) => {
   try {
     const { id } = DeletePropertyParams.parse(req.params);
-    await pool.query("DELETE FROM properties WHERE id = $1", [id]);
+    // Soft delete: the property (and its units, below) drop out of the active
+    // workspace, but the rows - and every payment that references them -
+    // stay in place so past records are never lost.
+    const result = await pool.query(
+      "UPDATE properties SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL",
+      [id],
+    );
+    if (result.rowCount) {
+      await pool.query(
+        "UPDATE flats SET deleted_at = now() WHERE property_id = $1 AND deleted_at IS NULL",
+        [id],
+      );
+    }
     res.status(204).send();
   } catch (error) { return next(error); }
 });
@@ -88,7 +101,8 @@ router.get("/flats", async (req, res, next) => {
         MAX(pay.payment_date) AS last_payment_date
       FROM flats f JOIN properties p ON p.id = f.property_id
       LEFT JOIN payments pay ON pay.flat_id = f.id
-      ${propertyId ? "WHERE f.property_id = $1" : ""}
+      WHERE f.deleted_at IS NULL AND p.deleted_at IS NULL
+      ${propertyId ? "AND f.property_id = $1" : ""}
       GROUP BY f.id, p.name ORDER BY f.flat_no ASC
     `, propertyId ? [propertyId] : []);
     res.json(ListFlatsResponse.parse(result.rows.map((row) => ({
@@ -125,7 +139,7 @@ router.patch("/flats/:id", async (req, res, next) => {
     const result = await pool.query(
       `UPDATE flats SET flat_no=COALESCE($1,flat_no), tenant_name=COALESCE($2,tenant_name), workplace=COALESCE($3,workplace),
        govt_id=COALESCE($4,govt_id), move_in_date=COALESCE($5,move_in_date), deposit=COALESCE($6,deposit), rent=COALESCE($7,rent)
-       WHERE id=$8 RETURNING *`,
+       WHERE id=$8 AND deleted_at IS NULL RETURNING *`,
       [input.flatNo ?? null, input.tenantName ?? null, input.workplace ?? null, input.govtId ?? null, input.moveInDate ?? null, input.deposit ?? null, input.rent ?? null, id],
     );
     if (!result.rowCount) return res.status(404).json({ error: "Flat not found" });
@@ -142,7 +156,9 @@ router.patch("/flats/:id", async (req, res, next) => {
 router.delete("/flats/:id", async (req, res, next) => {
   try {
     const { id } = DeleteFlatParams.parse(req.params);
-    await pool.query("DELETE FROM flats WHERE id=$1", [id]);
+    // Soft delete: the unit/tenant drops out of the active ledger, but its
+    // row - and every payment recorded against it - stays in place.
+    await pool.query("UPDATE flats SET deleted_at = now() WHERE id=$1 AND deleted_at IS NULL", [id]);
     res.status(204).send();
   } catch (error) { next(error); }
 });
@@ -161,22 +177,24 @@ router.post("/flats/:id/payments", async (req, res, next) => {
   try {
     const { id } = CreatePaymentParams.parse(req.params);
     const input = CreatePaymentBody.parse(req.body);
+    const flat = await pool.query("SELECT id FROM flats WHERE id = $1 AND deleted_at IS NULL", [id]);
+    if (!flat.rowCount) return res.status(404).json({ error: "Flat not found" });
     const result = await pool.query("INSERT INTO payments (flat_id, payment_date, amount) VALUES ($1,$2,$3) RETURNING *", [id, input.paymentDate, input.amount]);
     const row = result.rows[0];
-    res.status(201).json(CreatePaymentResponse.parse({
+    return res.status(201).json(CreatePaymentResponse.parse({
       id: row.id, createdAt: isoTimestamp(row.created_at), flatId: row.flat_id, paymentDate: isoDate(row.payment_date), amount: asNumber(row.amount),
     }));
-  } catch (error) { next(error); }
+  } catch (error) { return next(error); }
 });
 
 router.get("/dashboard/summary", async (_req, res, next) => {
   try {
     const result = await pool.query(`SELECT
       COALESCE(SUM(rent),0) AS expected, COUNT(*) FILTER (WHERE tenant_name <> '')::int AS occupied,
-      COUNT(*)::int AS total_units, (SELECT COUNT(*)::int FROM properties) AS properties_count,
+      COUNT(*)::int AS total_units, (SELECT COUNT(*)::int FROM properties WHERE deleted_at IS NULL) AS properties_count,
       COALESCE((SELECT SUM(amount) FROM payments),0) AS collected,
       COUNT(*) FILTER (WHERE move_in_date <= CURRENT_DATE - INTERVAL '11 months')::int AS due
-      FROM flats`);
+      FROM flats WHERE deleted_at IS NULL`);
     const row = result.rows[0];
     res.json(GetDashboardSummaryResponse.parse({
       expectedMonthlyRevenue: asNumber(row.expected), totalCollected: asNumber(row.collected), occupiedUnits: row.occupied,

@@ -1,9 +1,18 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import path from "node:path";
 import { pinoHttp } from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+
+const cookieSecret = process.env.COOKIE_SECRET;
+
+if (!cookieSecret) {
+  throw new Error(
+    "COOKIE_SECRET environment variable is required but was not provided.",
+  );
+}
 
 const app: Express = express();
 
@@ -27,6 +36,7 @@ app.use(
   }),
 );
 app.use(cors());
+app.use(cookieParser(cookieSecret));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

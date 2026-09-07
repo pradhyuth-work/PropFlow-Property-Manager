@@ -17,6 +17,112 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Check whether an owner account exists yet
+ */
+export const GetAuthStatusResponse = zod.object({
+  "hasOwner": zod.boolean()
+})
+
+
+/**
+ * @summary Create the first (and only) owner account
+ */
+export const setupOwnerBodyPasswordMin = 8;
+
+
+
+
+export const SetupOwnerBody = zod.object({
+  "email": zod.string(),
+  "password": zod.string().min(setupOwnerBodyPasswordMin),
+  "name": zod.string().min(1)
+})
+
+export const SetupOwnerResponse = zod.object({
+  "id": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string().nullable()
+})
+
+
+/**
+ * @summary Log in as the owner
+ */
+
+
+
+export const LoginBody = zod.object({
+  "email": zod.string(),
+  "password": zod.string().min(1)
+})
+
+export const LoginResponse = zod.object({
+  "id": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string().nullable()
+})
+
+
+/**
+ * @summary Log out
+ */
+export const LogoutResponse = zod.void()
+
+
+/**
+ * @summary Get the current owner's profile
+ */
+export const GetMeResponse = zod.object({
+  "id": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string().nullable()
+})
+
+
+/**
+ * @summary Update the current owner's profile
+ */
+
+
+
+export const UpdateMeBody = zod.object({
+  "name": zod.string().min(1).optional(),
+  "email": zod.string().optional(),
+  "phone": zod.string().optional()
+})
+
+export const UpdateMeResponse = zod.object({
+  "id": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string().nullable()
+})
+
+
+/**
+ * @summary Change the owner's password
+ */
+
+export const changePasswordBodyNewPasswordMin = 8;
+
+
+
+export const ChangePasswordBody = zod.object({
+  "currentPassword": zod.string().min(1),
+  "newPassword": zod.string().min(changePasswordBodyNewPasswordMin)
+})
+
+export const ChangePasswordResponse = zod.void()
+
+
+/**
  * @summary List properties
  */
 export const ListPropertiesResponseItem = zod.object({
