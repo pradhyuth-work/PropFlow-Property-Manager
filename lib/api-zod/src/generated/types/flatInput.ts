@@ -15,6 +15,7 @@ export interface FlatInput {
   workplace: string;
   govtId: string;
   moveInDate: Date;
+  tenureEnd: Date;
   /** @minimum 0 */
   deposit: number;
   /** @minimum 0 */

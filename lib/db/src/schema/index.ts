@@ -32,6 +32,10 @@ export const flats = pgTable("flats", {
   workplace: text("workplace").notNull(),
   govtId: text("govt_id").notNull(),
   moveInDate: date("move_in_date").notNull(),
+  // Tenure end: when the current lease term is due. moveInDate above is the
+  // tenure's start; a renewal moves this forward (and can change rent)
+  // without touching moveInDate, since the tenant didn't move in again.
+  tenureEnd: date("tenure_end").notNull(),
   deposit: numeric("deposit", { precision: 12, scale: 2 }).notNull(),
   rent: numeric("rent", { precision: 12, scale: 2 }).notNull(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),

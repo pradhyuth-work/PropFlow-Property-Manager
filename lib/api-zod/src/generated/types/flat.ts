@@ -16,6 +16,9 @@ export interface Flat {
   workplace: string;
   govtId: string;
   moveInDate: Date;
+  tenureEnd: Date;
+  /** True when tenureEnd is in the past */
+  isExpired: boolean;
   deposit: number;
   rent: number;
   totalPaid: number;

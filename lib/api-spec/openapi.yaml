@@ -257,6 +257,26 @@ paths:
       responses:
         "204":
           description: Deleted
+  /flats/{id}/renew:
+    post:
+      operationId: renewFlat
+      tags: [flats]
+      summary: Renew an expired (or expiring) tenure with a new end date and rent
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenewFlatInput"
+      responses:
+        "200":
+          description: Renewed flat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Flat"
   /flats/{id}/payments:
     get:
       operationId: listFlatPayments
@@ -355,7 +375,7 @@ components:
         address: { type: string, minLength: 1 }
     Flat:
       type: object
-      required: [id, createdAt, propertyId, propertyName, flatNo, tenantName, workplace, govtId, moveInDate, deposit, rent, totalPaid, lastPaymentDate]
+      required: [id, createdAt, propertyId, propertyName, flatNo, tenantName, workplace, govtId, moveInDate, tenureEnd, isExpired, deposit, rent, totalPaid, lastPaymentDate]
       properties:
         id: { type: string }
         createdAt: { type: string, format: date-time }
@@ -366,13 +386,15 @@ components:
         workplace: { type: string }
         govtId: { type: string }
         moveInDate: { type: string, format: date }
+        tenureEnd: { type: string, format: date }
+        isExpired: { type: boolean, description: "True when tenureEnd is in the past" }
         deposit: { type: number }
         rent: { type: number }
         totalPaid: { type: number }
         lastPaymentDate: { type: ["string", "null"], format: date }
     FlatInput:
       type: object
-      required: [propertyId, flatNo, tenantName, workplace, govtId, moveInDate, deposit, rent]
+      required: [propertyId, flatNo, tenantName, workplace, govtId, moveInDate, tenureEnd, deposit, rent]
       properties:
         propertyId: { type: string }
         flatNo: { type: string, minLength: 1 }
@@ -380,6 +402,7 @@ components:
         workplace: { type: string }
         govtId: { type: string }
         moveInDate: { type: string, format: date }
+        tenureEnd: { type: string, format: date }
         deposit: { type: number, minimum: 0 }
         rent: { type: number, minimum: 0 }
     FlatUpdate:
@@ -390,7 +413,14 @@ components:
         workplace: { type: string }
         govtId: { type: string }
         moveInDate: { type: string, format: date }
+        tenureEnd: { type: string, format: date }
         deposit: { type: number, minimum: 0 }
+        rent: { type: number, minimum: 0 }
+    RenewFlatInput:
+      type: object
+      required: [tenureEnd, rent]
+      properties:
+        tenureEnd: { type: string, format: date }
         rent: { type: number, minimum: 0 }
     Payment:
       type: object

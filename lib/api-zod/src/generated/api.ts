@@ -199,6 +199,8 @@ export const ListFlatsResponseItem = zod.object({
   "workplace": zod.string(),
   "govtId": zod.string(),
   "moveInDate": zod.coerce.date(),
+  "tenureEnd": zod.coerce.date(),
+  "isExpired": zod.boolean().describe('True when tenureEnd is in the past'),
   "deposit": zod.number(),
   "rent": zod.number(),
   "totalPaid": zod.number(),
@@ -225,6 +227,7 @@ export const CreateFlatBody = zod.object({
   "workplace": zod.string(),
   "govtId": zod.string(),
   "moveInDate": zod.coerce.date(),
+  "tenureEnd": zod.coerce.date(),
   "deposit": zod.number().min(createFlatBodyDepositMin),
   "rent": zod.number().min(createFlatBodyRentMin)
 })
@@ -239,6 +242,8 @@ export const CreateFlatResponse = zod.object({
   "workplace": zod.string(),
   "govtId": zod.string(),
   "moveInDate": zod.coerce.date(),
+  "tenureEnd": zod.coerce.date(),
+  "isExpired": zod.boolean().describe('True when tenureEnd is in the past'),
   "deposit": zod.number(),
   "rent": zod.number(),
   "totalPaid": zod.number(),
@@ -267,6 +272,7 @@ export const UpdateFlatBody = zod.object({
   "workplace": zod.string().optional(),
   "govtId": zod.string().optional(),
   "moveInDate": zod.coerce.date().optional(),
+  "tenureEnd": zod.coerce.date().optional(),
   "deposit": zod.number().min(updateFlatBodyDepositMin).optional(),
   "rent": zod.number().min(updateFlatBodyRentMin).optional()
 })
@@ -281,6 +287,8 @@ export const UpdateFlatResponse = zod.object({
   "workplace": zod.string(),
   "govtId": zod.string(),
   "moveInDate": zod.coerce.date(),
+  "tenureEnd": zod.coerce.date(),
+  "isExpired": zod.boolean().describe('True when tenureEnd is in the past'),
   "deposit": zod.number(),
   "rent": zod.number(),
   "totalPaid": zod.number(),
@@ -296,6 +304,41 @@ export const DeleteFlatParams = zod.object({
 })
 
 export const DeleteFlatResponse = zod.void()
+
+
+/**
+ * @summary Renew an expired (or expiring) tenure with a new end date and rent
+ */
+export const RenewFlatParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const renewFlatBodyRentMin = 0;
+
+
+
+export const RenewFlatBody = zod.object({
+  "tenureEnd": zod.coerce.date(),
+  "rent": zod.number().min(renewFlatBodyRentMin)
+})
+
+export const RenewFlatResponse = zod.object({
+  "id": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "propertyId": zod.string(),
+  "propertyName": zod.string(),
+  "flatNo": zod.string(),
+  "tenantName": zod.string(),
+  "workplace": zod.string(),
+  "govtId": zod.string(),
+  "moveInDate": zod.coerce.date(),
+  "tenureEnd": zod.coerce.date(),
+  "isExpired": zod.boolean().describe('True when tenureEnd is in the past'),
+  "deposit": zod.number(),
+  "rent": zod.number(),
+  "totalPaid": zod.number(),
+  "lastPaymentDate": zod.coerce.date().nullable()
+})
 
 
 /**

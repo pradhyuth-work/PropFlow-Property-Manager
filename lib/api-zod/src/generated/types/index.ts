@@ -24,4 +24,5 @@ export * from './paymentInput';
 export * from './property';
 export * from './propertyInput';
 export * from './propertyUpdate';
+export * from './renewFlatInput';
 export * from './setupBody';

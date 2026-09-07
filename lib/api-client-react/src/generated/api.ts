@@ -37,6 +37,7 @@ import type {
   Property,
   PropertyInput,
   PropertyUpdate,
+  RenewFlatInput,
   SetupBody
 } from './api.schemas';
 
@@ -1240,6 +1241,78 @@ export const useDeleteFlat = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteFlatMutationOptions(options));
+    }
+
+export const getRenewFlatUrl = (id: string,) => {
+
+
+
+
+  return `/api/flats/${id}/renew`
+}
+
+/**
+ * @summary Renew an expired (or expiring) tenure with a new end date and rent
+ */
+export const renewFlat = async (id: string,
+    renewFlatInput: RenewFlatInput, options?: Parameters<typeof customFetch>[1]): Promise<Flat> => {
+
+  return customFetch<Flat>(getRenewFlatUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(renewFlatInput)
+  }
+);}
+
+
+
+
+
+export const getRenewFlatMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof renewFlat>>, TError,{id: string;data: BodyType<RenewFlatInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof renewFlat>>, TError,{id: string;data: BodyType<RenewFlatInput>}, TContext> => {
+
+const mutationKey = ['renewFlat'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof renewFlat>>, {id: string;data: BodyType<RenewFlatInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  renewFlat(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RenewFlatMutationResult = NonNullable<Awaited<ReturnType<typeof renewFlat>>>
+    export type RenewFlatMutationBody = BodyType<RenewFlatInput>
+    export type RenewFlatMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Renew an expired (or expiring) tenure with a new end date and rent
+ */
+export const useRenewFlat = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof renewFlat>>, TError,{id: string;data: BodyType<RenewFlatInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof renewFlat>>,
+        TError,
+        {id: string;data: BodyType<RenewFlatInput>},
+        TContext
+      > => {
+      return useMutation(getRenewFlatMutationOptions(options));
     }
 
 export const getListFlatPaymentsUrl = (id: string,) => {

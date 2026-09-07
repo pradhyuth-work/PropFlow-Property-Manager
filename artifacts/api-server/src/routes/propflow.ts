@@ -16,6 +16,9 @@ import {
   UpdateFlatBody,
   UpdateFlatResponse,
   DeleteFlatParams,
+  RenewFlatParams,
+  RenewFlatBody,
+  RenewFlatResponse,
   ListFlatPaymentsParams,
   ListFlatPaymentsResponse,
   CreatePaymentParams,
@@ -109,8 +112,8 @@ router.get("/flats", async (req, res, next) => {
   try {
     const { propertyId } = ListFlatsQueryParams.parse(req.query);
     const result = await pool.query(`
-      SELECT f.*, p.name AS property_name, COALESCE(SUM(pay.amount), 0) AS total_paid,
-        MAX(pay.payment_date) AS last_payment_date
+      SELECT f.*, (f.tenure_end < CURRENT_DATE) AS is_expired, p.name AS property_name,
+        COALESCE(SUM(pay.amount), 0) AS total_paid, MAX(pay.payment_date) AS last_payment_date
       FROM flats f JOIN properties p ON p.id = f.property_id
       LEFT JOIN payments pay ON pay.flat_id = f.id
       WHERE f.deleted_at IS NULL AND p.deleted_at IS NULL
@@ -120,7 +123,8 @@ router.get("/flats", async (req, res, next) => {
     res.json(ListFlatsResponse.parse(result.rows.map((row) => ({
       id: row.id, createdAt: isoTimestamp(row.created_at), propertyId: row.property_id, propertyName: row.property_name,
       flatNo: row.flat_no, tenantName: row.tenant_name, workplace: row.workplace, govtId: row.govt_id,
-      moveInDate: isoDate(row.move_in_date), deposit: asNumber(row.deposit), rent: asNumber(row.rent),
+      moveInDate: isoDate(row.move_in_date), tenureEnd: isoDate(row.tenure_end), isExpired: row.is_expired,
+      deposit: asNumber(row.deposit), rent: asNumber(row.rent),
       totalPaid: asNumber(row.total_paid), lastPaymentDate: row.last_payment_date ? isoDate(row.last_payment_date) : null,
     }))));
   } catch (error) { return next(error); }
@@ -130,16 +134,17 @@ router.post("/flats", async (req, res, next) => {
   try {
     const input = CreateFlatBody.parse(req.body);
     const result = await pool.query(
-      `INSERT INTO flats (property_id, flat_no, tenant_name, workplace, govt_id, move_in_date, deposit, rent)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [input.propertyId, input.flatNo, input.tenantName, input.workplace, input.govtId, input.moveInDate, input.deposit, input.rent],
+      `INSERT INTO flats (property_id, flat_no, tenant_name, workplace, govt_id, move_in_date, tenure_end, deposit, rent)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *, (tenure_end < CURRENT_DATE) AS is_expired`,
+      [input.propertyId, input.flatNo, input.tenantName, input.workplace, input.govtId, input.moveInDate, input.tenureEnd, input.deposit, input.rent],
     );
     const row = result.rows[0];
     const property = await pool.query("SELECT name FROM properties WHERE id = $1", [row.property_id]);
     res.status(201).json(CreateFlatResponse.parse({
       id: row.id, createdAt: isoTimestamp(row.created_at), propertyId: row.property_id, propertyName: property.rows[0]?.name ?? "",
       flatNo: row.flat_no, tenantName: row.tenant_name, workplace: row.workplace, govtId: row.govt_id,
-      moveInDate: isoDate(row.move_in_date), deposit: asNumber(row.deposit), rent: asNumber(row.rent), totalPaid: 0, lastPaymentDate: null,
+      moveInDate: isoDate(row.move_in_date), tenureEnd: isoDate(row.tenure_end), isExpired: row.is_expired,
+      deposit: asNumber(row.deposit), rent: asNumber(row.rent), totalPaid: 0, lastPaymentDate: null,
     }));
   } catch (error) { next(error); }
 });
@@ -150,9 +155,10 @@ router.patch("/flats/:id", async (req, res, next) => {
     const input = UpdateFlatBody.parse(req.body);
     const result = await pool.query(
       `UPDATE flats SET flat_no=COALESCE($1,flat_no), tenant_name=COALESCE($2,tenant_name), workplace=COALESCE($3,workplace),
-       govt_id=COALESCE($4,govt_id), move_in_date=COALESCE($5,move_in_date), deposit=COALESCE($6,deposit), rent=COALESCE($7,rent)
-       WHERE id=$8 AND deleted_at IS NULL RETURNING *`,
-      [input.flatNo ?? null, input.tenantName ?? null, input.workplace ?? null, input.govtId ?? null, input.moveInDate ?? null, input.deposit ?? null, input.rent ?? null, id],
+       govt_id=COALESCE($4,govt_id), move_in_date=COALESCE($5,move_in_date), tenure_end=COALESCE($6,tenure_end),
+       deposit=COALESCE($7,deposit), rent=COALESCE($8,rent)
+       WHERE id=$9 AND deleted_at IS NULL RETURNING *, (tenure_end < CURRENT_DATE) AS is_expired`,
+      [input.flatNo ?? null, input.tenantName ?? null, input.workplace ?? null, input.govtId ?? null, input.moveInDate ?? null, input.tenureEnd ?? null, input.deposit ?? null, input.rent ?? null, id],
     );
     if (!result.rowCount) return res.status(404).json({ error: "Flat not found" });
     const row = result.rows[0];
@@ -160,7 +166,8 @@ router.patch("/flats/:id", async (req, res, next) => {
     return res.json(UpdateFlatResponse.parse({
       id: row.id, createdAt: isoTimestamp(row.created_at), propertyId: row.property_id, propertyName: property.rows[0]?.name ?? "",
       flatNo: row.flat_no, tenantName: row.tenant_name, workplace: row.workplace, govtId: row.govt_id,
-      moveInDate: isoDate(row.move_in_date), deposit: asNumber(row.deposit), rent: asNumber(row.rent), totalPaid: 0, lastPaymentDate: null,
+      moveInDate: isoDate(row.move_in_date), tenureEnd: isoDate(row.tenure_end), isExpired: row.is_expired,
+      deposit: asNumber(row.deposit), rent: asNumber(row.rent), totalPaid: 0, lastPaymentDate: null,
     }));
   } catch (error) { return next(error); }
 });
@@ -173,6 +180,35 @@ router.delete("/flats/:id", async (req, res, next) => {
     await pool.query("UPDATE flats SET deleted_at = now() WHERE id=$1 AND deleted_at IS NULL", [id]);
     res.status(204).send();
   } catch (error) { next(error); }
+});
+
+router.post("/flats/:id/renew", async (req, res, next) => {
+  try {
+    const { id } = RenewFlatParams.parse(req.params);
+    const input = RenewFlatBody.parse(req.body);
+    // Renewing only extends the tenure and (optionally) updates rent -
+    // moveInDate is untouched since the tenant didn't move in again.
+    const result = await pool.query(
+      `UPDATE flats SET tenure_end=$1, rent=$2 WHERE id=$3 AND deleted_at IS NULL
+       RETURNING *, (tenure_end < CURRENT_DATE) AS is_expired`,
+      [input.tenureEnd, input.rent, id],
+    );
+    if (!result.rowCount) return res.status(404).json({ error: "Flat not found" });
+    const row = result.rows[0];
+    const property = await pool.query("SELECT name FROM properties WHERE id = $1", [row.property_id]);
+    const totals = await pool.query(
+      "SELECT COALESCE(SUM(amount),0) AS total_paid, MAX(payment_date) AS last_payment_date FROM payments WHERE flat_id = $1",
+      [id],
+    );
+    return res.json(RenewFlatResponse.parse({
+      id: row.id, createdAt: isoTimestamp(row.created_at), propertyId: row.property_id, propertyName: property.rows[0]?.name ?? "",
+      flatNo: row.flat_no, tenantName: row.tenant_name, workplace: row.workplace, govtId: row.govt_id,
+      moveInDate: isoDate(row.move_in_date), tenureEnd: isoDate(row.tenure_end), isExpired: row.is_expired,
+      deposit: asNumber(row.deposit), rent: asNumber(row.rent),
+      totalPaid: asNumber(totals.rows[0].total_paid),
+      lastPaymentDate: totals.rows[0].last_payment_date ? isoDate(totals.rows[0].last_payment_date) : null,
+    }));
+  } catch (error) { return next(error); }
 });
 
 router.get("/flats/:id/payments", async (req, res, next) => {

@@ -41,6 +41,9 @@ export interface Flat {
   workplace: string;
   govtId: string;
   moveInDate: string;
+  tenureEnd: string;
+  /** True when tenureEnd is in the past */
+  isExpired: boolean;
   deposit: number;
   rent: number;
   totalPaid: number;
@@ -57,6 +60,7 @@ export interface FlatInput {
   workplace: string;
   govtId: string;
   moveInDate: string;
+  tenureEnd: string;
   /** @minimum 0 */
   deposit: number;
   /** @minimum 0 */
@@ -71,10 +75,17 @@ export interface FlatUpdate {
   workplace?: string;
   govtId?: string;
   moveInDate?: string;
+  tenureEnd?: string;
   /** @minimum 0 */
   deposit?: number;
   /** @minimum 0 */
   rent?: number;
+}
+
+export interface RenewFlatInput {
+  tenureEnd: string;
+  /** @minimum 0 */
+  rent: number;
 }
 
 export interface Payment {
