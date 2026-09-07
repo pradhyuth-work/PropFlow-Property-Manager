@@ -222,17 +222,24 @@ function AppShell({ owner }: { owner: Owner }) {
   const doLogout = () => {
     logout.mutate(undefined, {
       onSuccess: () => {
-        // Drop every cached query except auth/status: clearing that one too
-        // would make AuthGate briefly read "no owner" (data undefined) and
-        // flash the account-setup screen instead of going to login. Removing
-        // /auth/me still resolves AuthGate to LoginScreen immediately (it
-        // treats missing data as logged out), while this also clears out any
-        // cached tenant/property data so it isn't left sitting in memory
-        // after logout.
         const authStatusKey = getGetAuthStatusQueryKey()[0];
+        const meKey = getGetMeQueryKey()[0];
+        // Drop every other cached query (tenant/property data etc.) so it
+        // isn't left sitting in memory after logout. auth/status is kept so
+        // AuthGate doesn't misread "no owner" while re-checking (see the
+        // comment on that check below); auth/me is handled separately next.
         queryClient.removeQueries({
-          predicate: (query) => query.queryKey[0] !== authStatusKey,
+          predicate: (query) => query.queryKey[0] !== authStatusKey && query.queryKey[0] !== meKey,
         });
+        // invalidateQueries (not removeQueries) for auth/me specifically:
+        // removeQueries only deletes the cache entry, it does not trigger a
+        // refetch - the already-mounted useGetMe observer in AuthGate would
+        // just keep showing its last (still-authenticated) result until
+        // something else remounted it, so logging out never actually
+        // navigated to LoginScreen without a manual page reload.
+        // invalidateQueries explicitly refetches active observers, which
+        // gets the real (401) result and lets AuthGate switch over.
+        queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
       },
     });
   };
