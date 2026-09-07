@@ -46,9 +46,16 @@ const publicDir = path.join(__dirname, "public");
 app.use(express.static(publicDir));
 
 // SPA fallback: any non-API GET that didn't match a static file goes to
-// index.html so client-side routing (wouter) can take over.
+// index.html so client-side routing (wouter) can take over. Requests under
+// /assets are always a specific built file (JS/CSS chunk) referenced by a
+// content hash - if one 404s (e.g. a stale client still holding an old
+// index.html after a redeploy replaced the hashes) it must stay a real 404,
+// not silently become an HTML response: browsers enforce strict MIME
+// checking on <script type="module">, so serving index.html there fails
+// with a confusing "Expected a JavaScript... module script" error instead
+// of a clear "failed to load, please refresh" signal.
 app.use((req, res, next) => {
-  if (req.method !== "GET" || req.path.startsWith("/api")) {
+  if (req.method !== "GET" || req.path.startsWith("/api") || req.path.startsWith("/assets")) {
     return next();
   }
   res.sendFile(path.join(publicDir, "index.html"));
