@@ -64,6 +64,24 @@ export function formatMoney(value: number | undefined) {
 
 export function formatDate(value: string | null | undefined, withYear = false) {
   if (!value) return '—';
+  // Calendar-only values (move-in date, payment date) represent a specific
+  // day, not an instant. They arrive either as a bare "YYYY-MM-DD" string,
+  // or - once coerced through the API's response schema (zod.coerce.date())
+  // - as a full ISO timestamp pinned to UTC midnight ("...T00:00:00.000Z").
+  // Formatting either in the viewer's local timezone (Intl.DateTimeFormat's
+  // default) shifts the displayed day back for anyone in a timezone behind
+  // UTC. Format these using UTC components instead, so the day shown always
+  // matches the day that was actually entered/stored, regardless of viewer
+  // timezone. A genuine event timestamp (e.g. the activity feed's
+  // createdAt) is vanishingly unlikely to land on exact UTC midnight, so
+  // this pattern reliably tells the two apart and leaves real instants
+  // formatted in local time as before.
+  const isCalendarDate = /^\d{4}-\d{2}-\d{2}(T00:00:00(\.000)?Z)?$/.test(value);
   const date = new Date(value);
-  return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', ...(withYear ? { year: 'numeric' } : {}) }).format(date);
+  return new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    ...(withYear ? { year: 'numeric' } : {}),
+    ...(isCalendarDate ? { timeZone: 'UTC' } : {}),
+  }).format(date);
 }

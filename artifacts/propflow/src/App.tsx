@@ -101,6 +101,17 @@ function AppShell({ owner }: { owner: Owner }) {
     return matchesSearch && matchesProperty;
   }), [flats, ledgerSearch, propertyFilter]);
 
+  // selectedFlat is a snapshot captured when a row was clicked, so it goes
+  // stale the moment `flats` refetches with new data (e.g. right after
+  // recording a payment updates totalPaid) - the detail panel would keep
+  // showing the old figures until the flat was reselected. Re-point it at
+  // the current copy from the live list whenever that list changes.
+  useEffect(() => {
+    if (!selectedFlat) return;
+    const fresh = flats.find((flat) => flat.id === selectedFlat.id);
+    if (fresh && fresh !== selectedFlat) setSelectedFlat(fresh);
+  }, [flats]);
+
   useEffect(() => {
     if (!notice) return;
     const timeout = window.setTimeout(() => setNotice(null), 3600);

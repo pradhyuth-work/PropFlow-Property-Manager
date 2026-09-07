@@ -27,7 +27,19 @@ import {
 
 const router: IRouter = Router();
 const asNumber = (value: string | number | null) => Number(value ?? 0);
-const isoDate = (value: Date | string) => new Date(value).toISOString().slice(0, 10);
+// `pg` parses a SQL DATE column into a JS Date representing LOCAL midnight
+// for that calendar day. Converting that through .toISOString() (UTC) shifts
+// it back a day in any timezone ahead of UTC (e.g. IST), so a move-in/
+// payment date of 2026-09-07 was coming back as 2026-09-06. Read the
+// calendar components straight off the Date object instead - that stays
+// consistent with how it was constructed, regardless of server timezone.
+const isoDate = (value: Date | string) => {
+  if (typeof value === "string") return value.slice(0, 10);
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 const isoTimestamp = (value: Date | string) => new Date(value).toISOString();
 
 router.get("/properties", async (_req, res, next) => {
