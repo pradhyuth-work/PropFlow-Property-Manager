@@ -4,6 +4,7 @@
 
 - **Vercel project:** `prop-flow-property-manager-api-server` (team `blaze-27f8`)
 - **Production URL:** https://property-varasidhi.vercel.app
+- **Last verified working end-to-end (frontend + API + Git-triggered deploy):** 2026-09-07
 - **Root Directory (Vercel project setting):** `.` (the repo root) — **not** a subfolder.
 - **Framework Preset (Vercel project setting):** `Node`
 
