@@ -214,7 +214,7 @@ paths:
     post:
       operationId: createFlat
       tags: [flats]
-      summary: Create a flat and assign a tenant
+      summary: Create a unit, optionally assigning a tenant to it immediately
       requestBody:
         required: true
         content:
@@ -273,6 +273,20 @@ paths:
       responses:
         "200":
           description: Renewed flat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Flat"
+  /flats/{id}/vacate:
+    post:
+      operationId: vacateFlat
+      tags: [flats]
+      summary: Vacate a unit - clears the tenant assignment but keeps the unit itself
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Vacated flat
           content:
             application/json:
               schema:
@@ -368,6 +382,10 @@ components:
       properties:
         name: { type: string, minLength: 1 }
         address: { type: string, minLength: 1 }
+        unitNumbers:
+          type: array
+          items: { type: string, minLength: 1 }
+          description: "Unit numbers to create for this property up front. Tenants are assigned to these units later."
     PropertyUpdate:
       type: object
       properties:
@@ -375,26 +393,28 @@ components:
         address: { type: string, minLength: 1 }
     Flat:
       type: object
-      required: [id, createdAt, propertyId, propertyName, flatNo, tenantName, workplace, govtId, moveInDate, tenureEnd, isExpired, deposit, rent, totalPaid, lastPaymentDate]
+      required: [id, createdAt, propertyId, propertyName, flatNo, tenantName, workplace, govtId, moveInDate, tenureEnd, isExpired, isOccupied, deposit, rent, totalPaid, lastPaymentDate]
       properties:
         id: { type: string }
         createdAt: { type: string, format: date-time }
         propertyId: { type: string }
         propertyName: { type: string }
         flatNo: { type: string }
-        tenantName: { type: string }
-        workplace: { type: string }
-        govtId: { type: string }
-        moveInDate: { type: string, format: date }
-        tenureEnd: { type: string, format: date }
+        tenantName: { type: ["string", "null"] }
+        workplace: { type: ["string", "null"] }
+        govtId: { type: ["string", "null"] }
+        moveInDate: { type: ["string", "null"], format: date }
+        tenureEnd: { type: ["string", "null"], format: date }
         isExpired: { type: boolean, description: "True when tenureEnd is in the past" }
-        deposit: { type: number }
-        rent: { type: number }
+        isOccupied: { type: boolean, description: "True when a tenant is currently assigned to this unit" }
+        deposit: { type: ["number", "null"] }
+        rent: { type: ["number", "null"] }
         totalPaid: { type: number }
         lastPaymentDate: { type: ["string", "null"], format: date }
     FlatInput:
       type: object
-      required: [propertyId, flatNo, tenantName, workplace, govtId, moveInDate, tenureEnd, deposit, rent]
+      required: [propertyId, flatNo]
+      description: "Creates a unit. Tenant fields are optional here - a unit is usually created empty and a tenant assigned to it later."
       properties:
         propertyId: { type: string }
         flatNo: { type: string, minLength: 1 }

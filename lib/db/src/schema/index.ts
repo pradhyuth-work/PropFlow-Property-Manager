@@ -28,16 +28,20 @@ export const flats = pgTable("flats", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   propertyId: uuid("property_id").references(() => properties.id).notNull(),
   flatNo: text("flat_no").notNull(),
-  tenantName: text("tenant_name").notNull(),
-  workplace: text("workplace").notNull(),
-  govtId: text("govt_id").notNull(),
-  moveInDate: date("move_in_date").notNull(),
+  // A unit exists independently of any tenant - it's created with the
+  // property, before anyone has moved in. Everything below is tenancy
+  // detail, filled in when a tenant is assigned and cleared on vacate, so
+  // it all has to be nullable rather than required at unit creation.
+  tenantName: text("tenant_name"),
+  workplace: text("workplace"),
+  govtId: text("govt_id"),
+  moveInDate: date("move_in_date"),
   // Tenure end: when the current lease term is due. moveInDate above is the
   // tenure's start; a renewal moves this forward (and can change rent)
   // without touching moveInDate, since the tenant didn't move in again.
-  tenureEnd: date("tenure_end").notNull(),
-  deposit: numeric("deposit", { precision: 12, scale: 2 }).notNull(),
-  rent: numeric("rent", { precision: 12, scale: 2 }).notNull(),
+  tenureEnd: date("tenure_end"),
+  deposit: numeric("deposit", { precision: 12, scale: 2 }),
+  rent: numeric("rent", { precision: 12, scale: 2 }),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 

@@ -22,6 +22,11 @@ export interface PropertyInput {
   name: string;
   /** @minLength 1 */
   address: string;
+  /**
+     * Unit numbers to create for this property up front. Tenants are assigned to these units later.
+     * @items.minLength 1
+     */
+  unitNumbers?: string[];
 }
 
 export interface PropertyUpdate {
@@ -37,34 +42,46 @@ export interface Flat {
   propertyId: string;
   propertyName: string;
   flatNo: string;
-  tenantName: string;
-  workplace: string;
-  govtId: string;
-  moveInDate: string;
-  tenureEnd: string;
+  /** @nullable */
+  tenantName: string | null;
+  /** @nullable */
+  workplace: string | null;
+  /** @nullable */
+  govtId: string | null;
+  /** @nullable */
+  moveInDate: string | null;
+  /** @nullable */
+  tenureEnd: string | null;
   /** True when tenureEnd is in the past */
   isExpired: boolean;
-  deposit: number;
-  rent: number;
+  /** True when a tenant is currently assigned to this unit */
+  isOccupied: boolean;
+  /** @nullable */
+  deposit: number | null;
+  /** @nullable */
+  rent: number | null;
   totalPaid: number;
   /** @nullable */
   lastPaymentDate: string | null;
 }
 
+/**
+ * Creates a unit. Tenant fields are optional here - a unit is usually created empty and a tenant assigned to it later.
+ */
 export interface FlatInput {
   propertyId: string;
   /** @minLength 1 */
   flatNo: string;
   /** @minLength 1 */
-  tenantName: string;
-  workplace: string;
-  govtId: string;
-  moveInDate: string;
-  tenureEnd: string;
+  tenantName?: string;
+  workplace?: string;
+  govtId?: string;
+  moveInDate?: string;
+  tenureEnd?: string;
   /** @minimum 0 */
-  deposit: number;
+  deposit?: number;
   /** @minimum 0 */
-  rent: number;
+  rent?: number;
 }
 
 export interface FlatUpdate {

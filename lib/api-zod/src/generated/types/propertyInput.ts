@@ -11,4 +11,9 @@ export interface PropertyInput {
   name: string;
   /** @minLength 1 */
   address: string;
+  /**
+     * Unit numbers to create for this property up front. Tenants are assigned to these units later.
+     * @items.minLength 1
+     */
+  unitNumbers?: string[];
 }

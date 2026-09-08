@@ -19,6 +19,8 @@ import {
   RenewFlatParams,
   RenewFlatBody,
   RenewFlatResponse,
+  VacateFlatParams,
+  VacateFlatResponse,
   ListFlatPaymentsParams,
   ListFlatPaymentsResponse,
   CreatePaymentParams,
@@ -43,6 +45,8 @@ const isoDate = (value: Date | string) => {
   const day = String(value.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
+const isoDateOrNull = (value: Date | string | null) => (value == null ? null : isoDate(value));
+const numberOrNull = (value: string | number | null) => (value == null ? null : Number(value));
 const isoTimestamp = (value: Date | string) => new Date(value).toISOString();
 
 router.get("/properties", async (_req, res, next) => {
@@ -61,14 +65,31 @@ router.get("/properties", async (_req, res, next) => {
 router.post("/properties", async (req, res, next) => {
   try {
     const input = CreatePropertyBody.parse(req.body);
-    const result = await pool.query(
-      "INSERT INTO properties (name, address) VALUES ($1, $2) RETURNING *",
-      [input.name, input.address],
-    );
-    const row = result.rows[0];
-    res.status(201).json(CreatePropertyResponse.parse({
-      id: row.id, createdAt: isoTimestamp(row.created_at), name: row.name, address: row.address, unitCount: 0,
-    }));
+    // Units are created empty (no tenant) alongside the property, so the
+    // whole portfolio of a building can be entered in one step - tenants
+    // get mapped onto these units later via a separate assignment.
+    const unitNumbers = [...new Set((input.unitNumbers ?? []).map((flatNo) => flatNo.trim()).filter(Boolean))];
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await client.query(
+        "INSERT INTO properties (name, address) VALUES ($1, $2) RETURNING *",
+        [input.name, input.address],
+      );
+      const row = result.rows[0];
+      for (const flatNo of unitNumbers) {
+        await client.query("INSERT INTO flats (property_id, flat_no) VALUES ($1, $2)", [row.id, flatNo]);
+      }
+      await client.query("COMMIT");
+      res.status(201).json(CreatePropertyResponse.parse({
+        id: row.id, createdAt: isoTimestamp(row.created_at), name: row.name, address: row.address, unitCount: unitNumbers.length,
+      }));
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) { return next(error); }
 });
 
@@ -112,7 +133,8 @@ router.get("/flats", async (req, res, next) => {
   try {
     const { propertyId } = ListFlatsQueryParams.parse(req.query);
     const result = await pool.query(`
-      SELECT f.*, (f.tenure_end < CURRENT_DATE) AS is_expired, p.name AS property_name,
+      SELECT f.*, (f.tenure_end IS NOT NULL AND f.tenure_end < CURRENT_DATE) AS is_expired,
+        (f.tenant_name IS NOT NULL) AS is_occupied, p.name AS property_name,
         COALESCE(SUM(pay.amount), 0) AS total_paid, MAX(pay.payment_date) AS last_payment_date
       FROM flats f JOIN properties p ON p.id = f.property_id
       LEFT JOIN payments pay ON pay.flat_id = f.id
@@ -123,8 +145,8 @@ router.get("/flats", async (req, res, next) => {
     res.json(ListFlatsResponse.parse(result.rows.map((row) => ({
       id: row.id, createdAt: isoTimestamp(row.created_at), propertyId: row.property_id, propertyName: row.property_name,
       flatNo: row.flat_no, tenantName: row.tenant_name, workplace: row.workplace, govtId: row.govt_id,
-      moveInDate: isoDate(row.move_in_date), tenureEnd: isoDate(row.tenure_end), isExpired: row.is_expired,
-      deposit: asNumber(row.deposit), rent: asNumber(row.rent),
+      moveInDate: isoDateOrNull(row.move_in_date), tenureEnd: isoDateOrNull(row.tenure_end), isExpired: row.is_expired, isOccupied: row.is_occupied,
+      deposit: numberOrNull(row.deposit), rent: numberOrNull(row.rent),
       totalPaid: asNumber(row.total_paid), lastPaymentDate: row.last_payment_date ? isoDate(row.last_payment_date) : null,
     }))));
   } catch (error) { return next(error); }
@@ -135,16 +157,17 @@ router.post("/flats", async (req, res, next) => {
     const input = CreateFlatBody.parse(req.body);
     const result = await pool.query(
       `INSERT INTO flats (property_id, flat_no, tenant_name, workplace, govt_id, move_in_date, tenure_end, deposit, rent)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *, (tenure_end < CURRENT_DATE) AS is_expired`,
-      [input.propertyId, input.flatNo, input.tenantName, input.workplace, input.govtId, input.moveInDate, input.tenureEnd, input.deposit, input.rent],
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       RETURNING *, (tenure_end IS NOT NULL AND tenure_end < CURRENT_DATE) AS is_expired, (tenant_name IS NOT NULL) AS is_occupied`,
+      [input.propertyId, input.flatNo, input.tenantName ?? null, input.workplace ?? null, input.govtId ?? null, input.moveInDate ?? null, input.tenureEnd ?? null, input.deposit ?? null, input.rent ?? null],
     );
     const row = result.rows[0];
     const property = await pool.query("SELECT name FROM properties WHERE id = $1", [row.property_id]);
     res.status(201).json(CreateFlatResponse.parse({
       id: row.id, createdAt: isoTimestamp(row.created_at), propertyId: row.property_id, propertyName: property.rows[0]?.name ?? "",
       flatNo: row.flat_no, tenantName: row.tenant_name, workplace: row.workplace, govtId: row.govt_id,
-      moveInDate: isoDate(row.move_in_date), tenureEnd: isoDate(row.tenure_end), isExpired: row.is_expired,
-      deposit: asNumber(row.deposit), rent: asNumber(row.rent), totalPaid: 0, lastPaymentDate: null,
+      moveInDate: isoDateOrNull(row.move_in_date), tenureEnd: isoDateOrNull(row.tenure_end), isExpired: row.is_expired, isOccupied: row.is_occupied,
+      deposit: numberOrNull(row.deposit), rent: numberOrNull(row.rent), totalPaid: 0, lastPaymentDate: null,
     }));
   } catch (error) { next(error); }
 });
@@ -157,7 +180,8 @@ router.patch("/flats/:id", async (req, res, next) => {
       `UPDATE flats SET flat_no=COALESCE($1,flat_no), tenant_name=COALESCE($2,tenant_name), workplace=COALESCE($3,workplace),
        govt_id=COALESCE($4,govt_id), move_in_date=COALESCE($5,move_in_date), tenure_end=COALESCE($6,tenure_end),
        deposit=COALESCE($7,deposit), rent=COALESCE($8,rent)
-       WHERE id=$9 AND deleted_at IS NULL RETURNING *, (tenure_end < CURRENT_DATE) AS is_expired`,
+       WHERE id=$9 AND deleted_at IS NULL
+       RETURNING *, (tenure_end IS NOT NULL AND tenure_end < CURRENT_DATE) AS is_expired, (tenant_name IS NOT NULL) AS is_occupied`,
       [input.flatNo ?? null, input.tenantName ?? null, input.workplace ?? null, input.govtId ?? null, input.moveInDate ?? null, input.tenureEnd ?? null, input.deposit ?? null, input.rent ?? null, id],
     );
     if (!result.rowCount) return res.status(404).json({ error: "Flat not found" });
@@ -166,8 +190,8 @@ router.patch("/flats/:id", async (req, res, next) => {
     return res.json(UpdateFlatResponse.parse({
       id: row.id, createdAt: isoTimestamp(row.created_at), propertyId: row.property_id, propertyName: property.rows[0]?.name ?? "",
       flatNo: row.flat_no, tenantName: row.tenant_name, workplace: row.workplace, govtId: row.govt_id,
-      moveInDate: isoDate(row.move_in_date), tenureEnd: isoDate(row.tenure_end), isExpired: row.is_expired,
-      deposit: asNumber(row.deposit), rent: asNumber(row.rent), totalPaid: 0, lastPaymentDate: null,
+      moveInDate: isoDateOrNull(row.move_in_date), tenureEnd: isoDateOrNull(row.tenure_end), isExpired: row.is_expired, isOccupied: row.is_occupied,
+      deposit: numberOrNull(row.deposit), rent: numberOrNull(row.rent), totalPaid: 0, lastPaymentDate: null,
     }));
   } catch (error) { return next(error); }
 });
@@ -187,10 +211,11 @@ router.post("/flats/:id/renew", async (req, res, next) => {
     const { id } = RenewFlatParams.parse(req.params);
     const input = RenewFlatBody.parse(req.body);
     // Renewing only extends the tenure and (optionally) updates rent -
-    // moveInDate is untouched since the tenant didn't move in again.
+    // moveInDate is untouched since the tenant didn't move in again. Only
+    // applies to an occupied unit; a vacant one has no lease to renew.
     const result = await pool.query(
-      `UPDATE flats SET tenure_end=$1, rent=$2 WHERE id=$3 AND deleted_at IS NULL
-       RETURNING *, (tenure_end < CURRENT_DATE) AS is_expired`,
+      `UPDATE flats SET tenure_end=$1, rent=$2 WHERE id=$3 AND deleted_at IS NULL AND tenant_name IS NOT NULL
+       RETURNING *, (tenure_end IS NOT NULL AND tenure_end < CURRENT_DATE) AS is_expired, (tenant_name IS NOT NULL) AS is_occupied`,
       [input.tenureEnd, input.rent, id],
     );
     if (!result.rowCount) return res.status(404).json({ error: "Flat not found" });
@@ -203,8 +228,37 @@ router.post("/flats/:id/renew", async (req, res, next) => {
     return res.json(RenewFlatResponse.parse({
       id: row.id, createdAt: isoTimestamp(row.created_at), propertyId: row.property_id, propertyName: property.rows[0]?.name ?? "",
       flatNo: row.flat_no, tenantName: row.tenant_name, workplace: row.workplace, govtId: row.govt_id,
-      moveInDate: isoDate(row.move_in_date), tenureEnd: isoDate(row.tenure_end), isExpired: row.is_expired,
-      deposit: asNumber(row.deposit), rent: asNumber(row.rent),
+      moveInDate: isoDateOrNull(row.move_in_date), tenureEnd: isoDateOrNull(row.tenure_end), isExpired: row.is_expired, isOccupied: row.is_occupied,
+      deposit: numberOrNull(row.deposit), rent: numberOrNull(row.rent),
+      totalPaid: asNumber(totals.rows[0].total_paid),
+      lastPaymentDate: totals.rows[0].last_payment_date ? isoDate(totals.rows[0].last_payment_date) : null,
+    }));
+  } catch (error) { return next(error); }
+});
+
+router.post("/flats/:id/vacate", async (req, res, next) => {
+  try {
+    const { id } = VacateFlatParams.parse(req.params);
+    // Clears the tenant assignment but keeps the unit row itself, so the
+    // unit stays in the portfolio and can be assigned to a new tenant later.
+    const result = await pool.query(
+      `UPDATE flats SET tenant_name=NULL, workplace=NULL, govt_id=NULL, move_in_date=NULL, tenure_end=NULL, deposit=NULL, rent=NULL
+       WHERE id=$1 AND deleted_at IS NULL
+       RETURNING *, false AS is_expired, false AS is_occupied`,
+      [id],
+    );
+    if (!result.rowCount) return res.status(404).json({ error: "Flat not found" });
+    const row = result.rows[0];
+    const property = await pool.query("SELECT name FROM properties WHERE id = $1", [row.property_id]);
+    const totals = await pool.query(
+      "SELECT COALESCE(SUM(amount),0) AS total_paid, MAX(payment_date) AS last_payment_date FROM payments WHERE flat_id = $1",
+      [id],
+    );
+    return res.json(VacateFlatResponse.parse({
+      id: row.id, createdAt: isoTimestamp(row.created_at), propertyId: row.property_id, propertyName: property.rows[0]?.name ?? "",
+      flatNo: row.flat_no, tenantName: null, workplace: null, govtId: null,
+      moveInDate: null, tenureEnd: null, isExpired: false, isOccupied: false,
+      deposit: null, rent: null,
       totalPaid: asNumber(totals.rows[0].total_paid),
       lastPaymentDate: totals.rows[0].last_payment_date ? isoDate(totals.rows[0].last_payment_date) : null,
     }));
@@ -238,10 +292,10 @@ router.post("/flats/:id/payments", async (req, res, next) => {
 router.get("/dashboard/summary", async (_req, res, next) => {
   try {
     const result = await pool.query(`SELECT
-      COALESCE(SUM(rent),0) AS expected, COUNT(*) FILTER (WHERE tenant_name <> '')::int AS occupied,
+      COALESCE(SUM(rent),0) AS expected, COUNT(*) FILTER (WHERE tenant_name IS NOT NULL)::int AS occupied,
       COUNT(*)::int AS total_units, (SELECT COUNT(*)::int FROM properties WHERE deleted_at IS NULL) AS properties_count,
       COALESCE((SELECT SUM(amount) FROM payments),0) AS collected,
-      COUNT(*) FILTER (WHERE move_in_date <= CURRENT_DATE - INTERVAL '11 months')::int AS due
+      COUNT(*) FILTER (WHERE move_in_date IS NOT NULL AND move_in_date <= CURRENT_DATE - INTERVAL '11 months')::int AS due
       FROM flats WHERE deleted_at IS NULL`);
     const row = result.rows[0];
     res.json(GetDashboardSummaryResponse.parse({

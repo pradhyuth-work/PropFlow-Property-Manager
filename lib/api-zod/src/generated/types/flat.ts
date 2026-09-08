@@ -12,15 +12,24 @@ export interface Flat {
   propertyId: string;
   propertyName: string;
   flatNo: string;
-  tenantName: string;
-  workplace: string;
-  govtId: string;
-  moveInDate: Date;
-  tenureEnd: Date;
+  /** @nullable */
+  tenantName: string | null;
+  /** @nullable */
+  workplace: string | null;
+  /** @nullable */
+  govtId: string | null;
+  /** @nullable */
+  moveInDate: Date | null;
+  /** @nullable */
+  tenureEnd: Date | null;
   /** True when tenureEnd is in the past */
   isExpired: boolean;
-  deposit: number;
-  rent: number;
+  /** True when a tenant is currently assigned to this unit */
+  isOccupied: boolean;
+  /** @nullable */
+  deposit: number | null;
+  /** @nullable */
+  rent: number | null;
   totalPaid: number;
   /** @nullable */
   lastPaymentDate: Date | null;

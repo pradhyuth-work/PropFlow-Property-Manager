@@ -6,18 +6,21 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * Creates a unit. Tenant fields are optional here - a unit is usually created empty and a tenant assigned to it later.
+ */
 export interface FlatInput {
   propertyId: string;
   /** @minLength 1 */
   flatNo: string;
   /** @minLength 1 */
-  tenantName: string;
-  workplace: string;
-  govtId: string;
-  moveInDate: Date;
-  tenureEnd: Date;
+  tenantName?: string;
+  workplace?: string;
+  govtId?: string;
+  moveInDate?: Date;
+  tenureEnd?: Date;
   /** @minimum 0 */
-  deposit: number;
+  deposit?: number;
   /** @minimum 0 */
-  rent: number;
+  rent?: number;
 }

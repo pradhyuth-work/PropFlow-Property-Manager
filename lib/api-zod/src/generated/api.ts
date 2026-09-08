@@ -133,9 +133,11 @@ export const ListPropertiesResponse = zod.array(ListPropertiesResponseItem)
 
 
 
+
 export const CreatePropertyBody = zod.object({
   "name": zod.string().min(1),
-  "address": zod.string().min(1)
+  "address": zod.string().min(1),
+  "unitNumbers": zod.array(zod.string().min(1)).optional().describe('Unit numbers to create for this property up front. Tenants are assigned to these units later.')
 })
 
 export const CreatePropertyResponse = zod.object({
@@ -195,14 +197,15 @@ export const ListFlatsResponseItem = zod.object({
   "propertyId": zod.string(),
   "propertyName": zod.string(),
   "flatNo": zod.string(),
-  "tenantName": zod.string(),
-  "workplace": zod.string(),
-  "govtId": zod.string(),
-  "moveInDate": zod.coerce.date(),
-  "tenureEnd": zod.coerce.date(),
+  "tenantName": zod.string().nullable(),
+  "workplace": zod.string().nullable(),
+  "govtId": zod.string().nullable(),
+  "moveInDate": zod.coerce.date().nullable(),
+  "tenureEnd": zod.coerce.date().nullable(),
   "isExpired": zod.boolean().describe('True when tenureEnd is in the past'),
-  "deposit": zod.number(),
-  "rent": zod.number(),
+  "isOccupied": zod.boolean().describe('True when a tenant is currently assigned to this unit'),
+  "deposit": zod.number().nullable(),
+  "rent": zod.number().nullable(),
   "totalPaid": zod.number(),
   "lastPaymentDate": zod.coerce.date().nullable()
 })
@@ -210,7 +213,7 @@ export const ListFlatsResponse = zod.array(ListFlatsResponseItem)
 
 
 /**
- * @summary Create a flat and assign a tenant
+ * @summary Create a unit, optionally assigning a tenant to it immediately
  */
 
 
@@ -223,14 +226,14 @@ export const createFlatBodyRentMin = 0;
 export const CreateFlatBody = zod.object({
   "propertyId": zod.string(),
   "flatNo": zod.string().min(1),
-  "tenantName": zod.string().min(1),
-  "workplace": zod.string(),
-  "govtId": zod.string(),
-  "moveInDate": zod.coerce.date(),
-  "tenureEnd": zod.coerce.date(),
-  "deposit": zod.number().min(createFlatBodyDepositMin),
-  "rent": zod.number().min(createFlatBodyRentMin)
-})
+  "tenantName": zod.string().min(1).optional(),
+  "workplace": zod.string().optional(),
+  "govtId": zod.string().optional(),
+  "moveInDate": zod.coerce.date().optional(),
+  "tenureEnd": zod.coerce.date().optional(),
+  "deposit": zod.number().min(createFlatBodyDepositMin).optional(),
+  "rent": zod.number().min(createFlatBodyRentMin).optional()
+}).describe('Creates a unit. Tenant fields are optional here - a unit is usually created empty and a tenant assigned to it later.')
 
 export const CreateFlatResponse = zod.object({
   "id": zod.string(),
@@ -238,14 +241,15 @@ export const CreateFlatResponse = zod.object({
   "propertyId": zod.string(),
   "propertyName": zod.string(),
   "flatNo": zod.string(),
-  "tenantName": zod.string(),
-  "workplace": zod.string(),
-  "govtId": zod.string(),
-  "moveInDate": zod.coerce.date(),
-  "tenureEnd": zod.coerce.date(),
+  "tenantName": zod.string().nullable(),
+  "workplace": zod.string().nullable(),
+  "govtId": zod.string().nullable(),
+  "moveInDate": zod.coerce.date().nullable(),
+  "tenureEnd": zod.coerce.date().nullable(),
   "isExpired": zod.boolean().describe('True when tenureEnd is in the past'),
-  "deposit": zod.number(),
-  "rent": zod.number(),
+  "isOccupied": zod.boolean().describe('True when a tenant is currently assigned to this unit'),
+  "deposit": zod.number().nullable(),
+  "rent": zod.number().nullable(),
   "totalPaid": zod.number(),
   "lastPaymentDate": zod.coerce.date().nullable()
 })
@@ -283,14 +287,15 @@ export const UpdateFlatResponse = zod.object({
   "propertyId": zod.string(),
   "propertyName": zod.string(),
   "flatNo": zod.string(),
-  "tenantName": zod.string(),
-  "workplace": zod.string(),
-  "govtId": zod.string(),
-  "moveInDate": zod.coerce.date(),
-  "tenureEnd": zod.coerce.date(),
+  "tenantName": zod.string().nullable(),
+  "workplace": zod.string().nullable(),
+  "govtId": zod.string().nullable(),
+  "moveInDate": zod.coerce.date().nullable(),
+  "tenureEnd": zod.coerce.date().nullable(),
   "isExpired": zod.boolean().describe('True when tenureEnd is in the past'),
-  "deposit": zod.number(),
-  "rent": zod.number(),
+  "isOccupied": zod.boolean().describe('True when a tenant is currently assigned to this unit'),
+  "deposit": zod.number().nullable(),
+  "rent": zod.number().nullable(),
   "totalPaid": zod.number(),
   "lastPaymentDate": zod.coerce.date().nullable()
 })
@@ -328,14 +333,42 @@ export const RenewFlatResponse = zod.object({
   "propertyId": zod.string(),
   "propertyName": zod.string(),
   "flatNo": zod.string(),
-  "tenantName": zod.string(),
-  "workplace": zod.string(),
-  "govtId": zod.string(),
-  "moveInDate": zod.coerce.date(),
-  "tenureEnd": zod.coerce.date(),
+  "tenantName": zod.string().nullable(),
+  "workplace": zod.string().nullable(),
+  "govtId": zod.string().nullable(),
+  "moveInDate": zod.coerce.date().nullable(),
+  "tenureEnd": zod.coerce.date().nullable(),
   "isExpired": zod.boolean().describe('True when tenureEnd is in the past'),
-  "deposit": zod.number(),
-  "rent": zod.number(),
+  "isOccupied": zod.boolean().describe('True when a tenant is currently assigned to this unit'),
+  "deposit": zod.number().nullable(),
+  "rent": zod.number().nullable(),
+  "totalPaid": zod.number(),
+  "lastPaymentDate": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Vacate a unit - clears the tenant assignment but keeps the unit itself
+ */
+export const VacateFlatParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const VacateFlatResponse = zod.object({
+  "id": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "propertyId": zod.string(),
+  "propertyName": zod.string(),
+  "flatNo": zod.string(),
+  "tenantName": zod.string().nullable(),
+  "workplace": zod.string().nullable(),
+  "govtId": zod.string().nullable(),
+  "moveInDate": zod.coerce.date().nullable(),
+  "tenureEnd": zod.coerce.date().nullable(),
+  "isExpired": zod.boolean().describe('True when tenureEnd is in the past'),
+  "isOccupied": zod.boolean().describe('True when a tenant is currently assigned to this unit'),
+  "deposit": zod.number().nullable(),
+  "rent": zod.number().nullable(),
   "totalPaid": zod.number(),
   "lastPaymentDate": zod.coerce.date().nullable()
 })

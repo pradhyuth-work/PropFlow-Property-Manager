@@ -1038,7 +1038,7 @@ export const getCreateFlatUrl = () => {
 }
 
 /**
- * @summary Create a flat and assign a tenant
+ * @summary Create a unit, optionally assigning a tenant to it immediately
  */
 export const createFlat = async (flatInput: FlatInput, options?: Parameters<typeof customFetch>[1]): Promise<Flat> => {
 
@@ -1087,7 +1087,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateFlatMutationError = ErrorType<unknown>
 
     /**
- * @summary Create a flat and assign a tenant
+ * @summary Create a unit, optionally assigning a tenant to it immediately
  */
 export const useCreateFlat = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFlat>>, TError,{data: BodyType<FlatInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -1313,6 +1313,77 @@ export const useRenewFlat = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getRenewFlatMutationOptions(options));
+    }
+
+export const getVacateFlatUrl = (id: string,) => {
+
+
+
+
+  return `/api/flats/${id}/vacate`
+}
+
+/**
+ * @summary Vacate a unit - clears the tenant assignment but keeps the unit itself
+ */
+export const vacateFlat = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<Flat> => {
+
+  return customFetch<Flat>(getVacateFlatUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getVacateFlatMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof vacateFlat>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof vacateFlat>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['vacateFlat'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof vacateFlat>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  vacateFlat(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VacateFlatMutationResult = NonNullable<Awaited<ReturnType<typeof vacateFlat>>>
+
+    export type VacateFlatMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Vacate a unit - clears the tenant assignment but keeps the unit itself
+ */
+export const useVacateFlat = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof vacateFlat>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof vacateFlat>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getVacateFlatMutationOptions(options));
     }
 
 export const getListFlatPaymentsUrl = (id: string,) => {
