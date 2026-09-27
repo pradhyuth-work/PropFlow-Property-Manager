@@ -49,6 +49,8 @@ export interface Flat {
   /** @nullable */
   govtId: string | null;
   /** @nullable */
+  phone: string | null;
+  /** @nullable */
   moveInDate: string | null;
   /** @nullable */
   tenureEnd: string | null;
@@ -76,6 +78,7 @@ export interface FlatInput {
   tenantName?: string;
   workplace?: string;
   govtId?: string;
+  phone?: string;
   moveInDate?: string;
   tenureEnd?: string;
   /** @minimum 0 */
@@ -91,6 +94,7 @@ export interface FlatUpdate {
   tenantName?: string;
   workplace?: string;
   govtId?: string;
+  phone?: string;
   moveInDate?: string;
   tenureEnd?: string;
   /** @minimum 0 */

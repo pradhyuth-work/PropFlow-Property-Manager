@@ -393,7 +393,7 @@ components:
         address: { type: string, minLength: 1 }
     Flat:
       type: object
-      required: [id, createdAt, propertyId, propertyName, flatNo, tenantName, workplace, govtId, moveInDate, tenureEnd, isExpired, isOccupied, deposit, rent, totalPaid, lastPaymentDate]
+      required: [id, createdAt, propertyId, propertyName, flatNo, tenantName, workplace, govtId, phone, moveInDate, tenureEnd, isExpired, isOccupied, deposit, rent, totalPaid, lastPaymentDate]
       properties:
         id: { type: string }
         createdAt: { type: string, format: date-time }
@@ -403,6 +403,7 @@ components:
         tenantName: { type: ["string", "null"] }
         workplace: { type: ["string", "null"] }
         govtId: { type: ["string", "null"] }
+        phone: { type: ["string", "null"] }
         moveInDate: { type: ["string", "null"], format: date }
         tenureEnd: { type: ["string", "null"], format: date }
         isExpired: { type: boolean, description: "True when tenureEnd is in the past" }
@@ -421,6 +422,7 @@ components:
         tenantName: { type: string, minLength: 1 }
         workplace: { type: string }
         govtId: { type: string }
+        phone: { type: string }
         moveInDate: { type: string, format: date }
         tenureEnd: { type: string, format: date }
         deposit: { type: number, minimum: 0 }
@@ -432,6 +434,7 @@ components:
         tenantName: { type: string, minLength: 1 }
         workplace: { type: string }
         govtId: { type: string }
+        phone: { type: string }
         moveInDate: { type: string, format: date }
         tenureEnd: { type: string, format: date }
         deposit: { type: number, minimum: 0 }

@@ -35,6 +35,7 @@ export const flats = pgTable("flats", {
   tenantName: text("tenant_name"),
   workplace: text("workplace"),
   govtId: text("govt_id"),
+  phone: text("phone"),
   moveInDate: date("move_in_date"),
   // Tenure end: when the current lease term is due. moveInDate above is the
   // tenure's start; a renewal moves this forward (and can change rent)

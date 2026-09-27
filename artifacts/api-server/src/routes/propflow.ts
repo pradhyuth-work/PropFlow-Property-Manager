@@ -144,7 +144,7 @@ router.get("/flats", async (req, res, next) => {
     `, propertyId ? [propertyId] : []);
     res.json(ListFlatsResponse.parse(result.rows.map((row) => ({
       id: row.id, createdAt: isoTimestamp(row.created_at), propertyId: row.property_id, propertyName: row.property_name,
-      flatNo: row.flat_no, tenantName: row.tenant_name, workplace: row.workplace, govtId: row.govt_id,
+      flatNo: row.flat_no, tenantName: row.tenant_name, workplace: row.workplace, govtId: row.govt_id, phone: row.phone,
       moveInDate: isoDateOrNull(row.move_in_date), tenureEnd: isoDateOrNull(row.tenure_end), isExpired: row.is_expired, isOccupied: row.is_occupied,
       deposit: numberOrNull(row.deposit), rent: numberOrNull(row.rent),
       totalPaid: asNumber(row.total_paid), lastPaymentDate: row.last_payment_date ? isoDate(row.last_payment_date) : null,
@@ -156,16 +156,16 @@ router.post("/flats", async (req, res, next) => {
   try {
     const input = CreateFlatBody.parse(req.body);
     const result = await pool.query(
-      `INSERT INTO flats (property_id, flat_no, tenant_name, workplace, govt_id, move_in_date, tenure_end, deposit, rent)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      `INSERT INTO flats (property_id, flat_no, tenant_name, workplace, govt_id, phone, move_in_date, tenure_end, deposit, rent)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        RETURNING *, (tenure_end IS NOT NULL AND tenure_end < CURRENT_DATE) AS is_expired, (tenant_name IS NOT NULL) AS is_occupied`,
-      [input.propertyId, input.flatNo, input.tenantName ?? null, input.workplace ?? null, input.govtId ?? null, input.moveInDate ?? null, input.tenureEnd ?? null, input.deposit ?? null, input.rent ?? null],
+      [input.propertyId, input.flatNo, input.tenantName ?? null, input.workplace ?? null, input.govtId ?? null, input.phone ?? null, input.moveInDate ?? null, input.tenureEnd ?? null, input.deposit ?? null, input.rent ?? null],
     );
     const row = result.rows[0];
     const property = await pool.query("SELECT name FROM properties WHERE id = $1", [row.property_id]);
     res.status(201).json(CreateFlatResponse.parse({
       id: row.id, createdAt: isoTimestamp(row.created_at), propertyId: row.property_id, propertyName: property.rows[0]?.name ?? "",
-      flatNo: row.flat_no, tenantName: row.tenant_name, workplace: row.workplace, govtId: row.govt_id,
+      flatNo: row.flat_no, tenantName: row.tenant_name, workplace: row.workplace, govtId: row.govt_id, phone: row.phone,
       moveInDate: isoDateOrNull(row.move_in_date), tenureEnd: isoDateOrNull(row.tenure_end), isExpired: row.is_expired, isOccupied: row.is_occupied,
       deposit: numberOrNull(row.deposit), rent: numberOrNull(row.rent), totalPaid: 0, lastPaymentDate: null,
     }));
@@ -178,18 +178,18 @@ router.patch("/flats/:id", async (req, res, next) => {
     const input = UpdateFlatBody.parse(req.body);
     const result = await pool.query(
       `UPDATE flats SET flat_no=COALESCE($1,flat_no), tenant_name=COALESCE($2,tenant_name), workplace=COALESCE($3,workplace),
-       govt_id=COALESCE($4,govt_id), move_in_date=COALESCE($5,move_in_date), tenure_end=COALESCE($6,tenure_end),
-       deposit=COALESCE($7,deposit), rent=COALESCE($8,rent)
-       WHERE id=$9 AND deleted_at IS NULL
+       govt_id=COALESCE($4,govt_id), phone=COALESCE($5,phone), move_in_date=COALESCE($6,move_in_date), tenure_end=COALESCE($7,tenure_end),
+       deposit=COALESCE($8,deposit), rent=COALESCE($9,rent)
+       WHERE id=$10 AND deleted_at IS NULL
        RETURNING *, (tenure_end IS NOT NULL AND tenure_end < CURRENT_DATE) AS is_expired, (tenant_name IS NOT NULL) AS is_occupied`,
-      [input.flatNo ?? null, input.tenantName ?? null, input.workplace ?? null, input.govtId ?? null, input.moveInDate ?? null, input.tenureEnd ?? null, input.deposit ?? null, input.rent ?? null, id],
+      [input.flatNo ?? null, input.tenantName ?? null, input.workplace ?? null, input.govtId ?? null, input.phone ?? null, input.moveInDate ?? null, input.tenureEnd ?? null, input.deposit ?? null, input.rent ?? null, id],
     );
     if (!result.rowCount) return res.status(404).json({ error: "Flat not found" });
     const row = result.rows[0];
     const property = await pool.query("SELECT name FROM properties WHERE id = $1", [row.property_id]);
     return res.json(UpdateFlatResponse.parse({
       id: row.id, createdAt: isoTimestamp(row.created_at), propertyId: row.property_id, propertyName: property.rows[0]?.name ?? "",
-      flatNo: row.flat_no, tenantName: row.tenant_name, workplace: row.workplace, govtId: row.govt_id,
+      flatNo: row.flat_no, tenantName: row.tenant_name, workplace: row.workplace, govtId: row.govt_id, phone: row.phone,
       moveInDate: isoDateOrNull(row.move_in_date), tenureEnd: isoDateOrNull(row.tenure_end), isExpired: row.is_expired, isOccupied: row.is_occupied,
       deposit: numberOrNull(row.deposit), rent: numberOrNull(row.rent), totalPaid: 0, lastPaymentDate: null,
     }));
@@ -227,7 +227,7 @@ router.post("/flats/:id/renew", async (req, res, next) => {
     );
     return res.json(RenewFlatResponse.parse({
       id: row.id, createdAt: isoTimestamp(row.created_at), propertyId: row.property_id, propertyName: property.rows[0]?.name ?? "",
-      flatNo: row.flat_no, tenantName: row.tenant_name, workplace: row.workplace, govtId: row.govt_id,
+      flatNo: row.flat_no, tenantName: row.tenant_name, workplace: row.workplace, govtId: row.govt_id, phone: row.phone,
       moveInDate: isoDateOrNull(row.move_in_date), tenureEnd: isoDateOrNull(row.tenure_end), isExpired: row.is_expired, isOccupied: row.is_occupied,
       deposit: numberOrNull(row.deposit), rent: numberOrNull(row.rent),
       totalPaid: asNumber(totals.rows[0].total_paid),
@@ -242,7 +242,7 @@ router.post("/flats/:id/vacate", async (req, res, next) => {
     // Clears the tenant assignment but keeps the unit row itself, so the
     // unit stays in the portfolio and can be assigned to a new tenant later.
     const result = await pool.query(
-      `UPDATE flats SET tenant_name=NULL, workplace=NULL, govt_id=NULL, move_in_date=NULL, tenure_end=NULL, deposit=NULL, rent=NULL
+      `UPDATE flats SET tenant_name=NULL, workplace=NULL, govt_id=NULL, phone=NULL, move_in_date=NULL, tenure_end=NULL, deposit=NULL, rent=NULL
        WHERE id=$1 AND deleted_at IS NULL
        RETURNING *, false AS is_expired, false AS is_occupied`,
       [id],
@@ -256,7 +256,7 @@ router.post("/flats/:id/vacate", async (req, res, next) => {
     );
     return res.json(VacateFlatResponse.parse({
       id: row.id, createdAt: isoTimestamp(row.created_at), propertyId: row.property_id, propertyName: property.rows[0]?.name ?? "",
-      flatNo: row.flat_no, tenantName: null, workplace: null, govtId: null,
+      flatNo: row.flat_no, tenantName: null, workplace: null, govtId: null, phone: null,
       moveInDate: null, tenureEnd: null, isExpired: false, isOccupied: false,
       deposit: null, rent: null,
       totalPaid: asNumber(totals.rows[0].total_paid),

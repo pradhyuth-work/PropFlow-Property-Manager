@@ -19,6 +19,8 @@ export interface Flat {
   /** @nullable */
   govtId: string | null;
   /** @nullable */
+  phone: string | null;
+  /** @nullable */
   moveInDate: Date | null;
   /** @nullable */
   tenureEnd: Date | null;
