@@ -73,6 +73,14 @@ const navItems: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'ledger', label: 'Rent ledger', icon: ReceiptIndianRupee },
 ];
 
+// The one brand mark for the whole app - sidebar, login/setup screens, the
+// compact mobile header. Same amber-on-navy treatment everywhere so it reads
+// as a single app identity, matching the icon used for the favicon and the
+// installable PWA icon.
+function Logo({ className = 'h-9 w-9 rounded-[11px]', iconSize = 19 }: { className?: string; iconSize?: number }) {
+  return <div className={`flex shrink-0 items-center justify-center bg-[hsl(var(--sidebar-primary))] text-[hsl(var(--sidebar-primary-foreground))] ${className}`}><Building2 size={iconSize} strokeWidth={2.5} /></div>;
+}
+
 function AppShell({ owner }: { owner: Owner }) {
   const [view, setView] = useState<View>('overview');
   const [mobileNav, setMobileNav] = useState(false);
@@ -380,14 +388,14 @@ function AppShell({ owner }: { owner: Owner }) {
 
   return (
     <div className="noise flex min-h-[100dvh] bg-[hsl(var(--background))]">
-      <aside className={`fixed inset-y-0 left-0 z-30 flex w-[270px] flex-col border-r border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar))] px-5 py-6 transition-transform duration-300 md:static md:translate-x-0 ${mobileNav ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className="safe-top safe-x hidden w-[270px] shrink-0 flex-col border-r border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar))] px-5 py-6 md:flex">
         <div className="flex items-center gap-3 px-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-[hsl(var(--sidebar-primary))] text-[hsl(var(--sidebar-primary-foreground))]"><Building2 size={19} strokeWidth={2.5} /></div>
+          <Logo />
           <div><p className="display text-[18px] font-bold tracking-[-.06em] text-[hsl(var(--sidebar-foreground))]">PropFlow</p><p className="mono text-[9px] uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.5)]">operator workspace</p></div>
         </div>
         <div className="mt-12 px-3"><p className="mono mb-3 text-[9px] uppercase tracking-[.18em] text-[hsl(var(--sidebar-foreground)/.42)]">Workspace</p>
           <nav className="space-y-1">
-            {navItems.map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => { setView(id); setMobileNav(false); navigate('/'); }} data-testid={`button-nav-${id}`} className={`group flex w-full items-center gap-3 rounded-[9px] px-3 py-2.5 text-left text-[13px] font-semibold transition-colors ${view === id ? 'bg-[hsl(var(--sidebar-accent))] text-[hsl(var(--sidebar-foreground))]' : 'text-[hsl(var(--sidebar-foreground)/.62)] hover:bg-[hsl(var(--sidebar-accent)/.65)] hover:text-[hsl(var(--sidebar-foreground))]'}`}><Icon size={17} className={view === id ? 'text-[hsl(var(--sidebar-primary))]' : ''} /><span>{label}</span>{id === 'ledger' && summary?.dueForRevision ? <span className="mono ml-auto rounded-full bg-[hsl(var(--accent))] px-1.5 py-0.5 text-[9px] font-medium text-[hsl(var(--accent-foreground))]">{summary.dueForRevision}</span> : null}</button>)}
+            {navItems.map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => { setView(id); navigate('/'); }} data-testid={`button-nav-${id}`} className={`group flex w-full items-center gap-3 rounded-[9px] px-3 py-2.5 text-left text-[13px] font-semibold transition-colors ${view === id ? 'bg-[hsl(var(--sidebar-accent))] text-[hsl(var(--sidebar-foreground))]' : 'text-[hsl(var(--sidebar-foreground)/.62)] hover:bg-[hsl(var(--sidebar-accent)/.65)] hover:text-[hsl(var(--sidebar-foreground))]'}`}><Icon size={17} className={view === id ? 'text-[hsl(var(--sidebar-primary))]' : ''} /><span>{label}</span>{id === 'ledger' && summary?.dueForRevision ? <span className="mono ml-auto rounded-full bg-[hsl(var(--accent))] px-1.5 py-0.5 text-[9px] font-medium text-[hsl(var(--accent-foreground))]">{summary.dueForRevision}</span> : null}</button>)}
           </nav>
         </div>
         <div className="relative mt-auto px-1">
@@ -395,13 +403,25 @@ function AppShell({ owner }: { owner: Owner }) {
           <AccountMenu open={sidebarMenuOpen} onClose={() => setSidebarMenuOpen(false)} onOpenProfile={() => setProfileModal(true)} onLogout={doLogout} anchor="bottom" />
         </div>
       </aside>
-      {mobileNav && <button type="button" aria-label="Close navigation" data-testid="button-close-navigation" onClick={() => setMobileNav(false)} className="fixed inset-0 z-20 bg-[hsl(var(--foreground)/.35)] md:hidden" />}
       <main className="min-w-0 flex-1">
-        <header className="sticky top-0 z-10 flex h-[70px] items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.9)] px-5 backdrop-blur-md sm:px-8">
-          <div className="flex items-center gap-3"><button type="button" onClick={() => setMobileNav(true)} data-testid="button-open-navigation" className="rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] md:hidden"><Menu size={19} /></button><div><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--muted-foreground))]">{activePropertyId ? 'Property detail' : todayLabel}</p><h1 className="display mt-0.5 text-[18px] font-semibold tracking-[-.035em]">{activePropertyId ? (activeProperty?.name ?? 'Property') : view === 'overview' ? `${greeting}, ${firstName}` : 'Rent ledger'}</h1></div></div>
-          <div className="flex items-center gap-3"><div className="hidden items-center gap-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card)/.6)] px-3 py-1.5 sm:flex"><span className={`h-1.5 w-1.5 rounded-full ${health.isError ? 'bg-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary))]'}`} /><span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{health.isError ? 'offline' : 'live sync'}</span></div><button type="button" onClick={() => openCreateProperty()} data-testid="button-header-add-property" className="hidden items-center gap-2 rounded-[9px] bg-[hsl(var(--primary))] px-3 py-2 text-[12px] font-bold text-[hsl(var(--primary-foreground))] shadow-sm transition-transform hover:-translate-y-0.5 sm:flex"><Plus size={15} />Add property</button><div className="relative"><button type="button" onClick={() => setHeaderMenuOpen((open) => !open)} data-testid="button-header-account-menu" className="flex h-8 w-8 items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[11px] font-bold text-[hsl(var(--foreground))] transition-colors hover:border-[hsl(var(--primary))]">{ownerInitials}</button><AccountMenu open={headerMenuOpen} onClose={() => setHeaderMenuOpen(false)} onOpenProfile={() => setProfileModal(true)} onLogout={doLogout} anchor="top-right" /></div></div>
+        <header className="safe-top safe-x sticky top-0 z-10 border-b border-[hsl(var(--border))] bg-[hsl(var(--background)/.9)] backdrop-blur-md">
+          <div className="flex h-[70px] items-center justify-between px-5 sm:px-8">
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setMobileNav((open) => !open)} data-testid="button-open-navigation" aria-label="Toggle navigation" className="rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] md:hidden"><Menu size={19} /></button>
+              <div className="flex items-center gap-2.5 md:hidden"><Logo className="h-8 w-8 rounded-[10px]" iconSize={16} /><p className="display text-[15px] font-bold tracking-[-.05em] text-[hsl(var(--foreground))]">PropFlow</p></div>
+              <div className="hidden md:block"><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--muted-foreground))]">{activePropertyId ? 'Property detail' : todayLabel}</p><h1 className="display mt-0.5 text-[18px] font-semibold tracking-[-.035em]">{activePropertyId ? (activeProperty?.name ?? 'Property') : view === 'overview' ? `${greeting}, ${firstName}` : 'Rent ledger'}</h1></div>
+            </div>
+            <div className="flex items-center gap-3"><div className="hidden items-center gap-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card)/.6)] px-3 py-1.5 sm:flex"><span className={`h-1.5 w-1.5 rounded-full ${health.isError ? 'bg-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary))]'}`} /><span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{health.isError ? 'offline' : 'live sync'}</span></div><button type="button" onClick={() => openCreateProperty()} data-testid="button-header-add-property" className="hidden items-center gap-2 rounded-[9px] bg-[hsl(var(--primary))] px-3 py-2 text-[12px] font-bold text-[hsl(var(--primary-foreground))] shadow-sm transition-transform hover:-translate-y-0.5 sm:flex"><Plus size={15} />Add property</button><div className="relative"><button type="button" onClick={() => setHeaderMenuOpen((open) => !open)} data-testid="button-header-account-menu" className="flex h-8 w-8 items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[11px] font-bold text-[hsl(var(--foreground))] transition-colors hover:border-[hsl(var(--primary))]">{ownerInitials}</button><AccountMenu open={headerMenuOpen} onClose={() => setHeaderMenuOpen(false)} onOpenProfile={() => setProfileModal(true)} onLogout={doLogout} anchor="top-right" /></div></div>
+          </div>
+          {mobileNav && <div className="animate-rise-in border-t border-[hsl(var(--border))] px-5 py-3 sm:px-8 md:hidden">
+            <nav className="grid grid-cols-2 gap-2">
+              {navItems.map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => { setView(id); setMobileNav(false); navigate('/'); }} data-testid={`button-mobile-nav-${id}`} className={`flex items-center gap-2.5 rounded-[10px] px-3 py-3 text-left text-[12px] font-semibold transition-colors ${view === id ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--muted))] text-[hsl(var(--foreground))]'}`}><Icon size={17} /><span>{label}</span>{id === 'ledger' && summary?.dueForRevision ? <span className="mono ml-auto rounded-full bg-[hsl(var(--accent))] px-1.5 py-0.5 text-[9px] font-medium text-[hsl(var(--accent-foreground))]">{summary.dueForRevision}</span> : null}</button>)}
+              <button type="button" onClick={() => { openCreateProperty(); setMobileNav(false); }} data-testid="button-mobile-nav-add-property" className="flex items-center gap-2.5 rounded-[10px] bg-[hsl(var(--muted))] px-3 py-3 text-left text-[12px] font-semibold text-[hsl(var(--foreground))]"><Plus size={17} /><span>Add property</span></button>
+              <button type="button" onClick={() => { doLogout(); setMobileNav(false); }} data-testid="button-mobile-nav-logout" className="flex items-center gap-2.5 rounded-[10px] bg-[hsl(var(--muted))] px-3 py-3 text-left text-[12px] font-semibold text-[hsl(var(--destructive))]"><LogOut size={17} /><span>Log out</span></button>
+            </nav>
+          </div>}
         </header>
-        <div className="workspace-grid mx-auto min-h-[calc(100dvh-70px)] max-w-[1600px] px-5 py-8 sm:px-8 lg:px-12">
+        <div className="workspace-grid safe-bottom safe-x mx-auto min-h-[calc(100dvh-70px)] max-w-[1600px] px-5 py-8 sm:px-8 lg:px-12">
           {notice && <div data-testid="status-notice" className={`animate-rise-in mb-5 flex items-center gap-2 rounded-[10px] border px-3.5 py-2.5 text-[12px] font-semibold ${notice.tone === 'success' ? 'border-[hsl(var(--primary)/.35)] bg-[hsl(var(--primary)/.12)] text-[hsl(var(--primary-foreground))]' : 'border-[hsl(var(--destructive)/.3)] bg-[hsl(var(--destructive)/.1)] text-[hsl(var(--destructive))]'}`}><span className={`flex h-5 w-5 items-center justify-center rounded-full ${notice.tone === 'success' ? 'bg-[hsl(var(--primary))]' : 'bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]'}`}>{notice.tone === 'success' ? <Check size={13} /> : <X size={13} />}</span>{notice.text}<button type="button" data-testid="button-dismiss-notice" onClick={() => setNotice(null)} className="ml-auto opacity-60 hover:opacity-100"><X size={14} /></button></div>}
           {isAnyError ? <ErrorState onRetry={retryQueries} /> : isInitialLoading ? <WorkspaceSkeleton /> : activePropertyId ? <PropertyDetail property={activeProperty} flats={activePropertyFlats} onBack={() => navigate('/')} onEditProperty={() => activeProperty && openEditProperty(activeProperty)} onAddFlat={() => openCreateFlat(activePropertyId)} onAssignTenant={() => openAssignTenant(activePropertyId)} onSelectFlat={setSelectedFlat} onRecordPayment={openPayment} /> : view === 'overview' ? <Overview properties={properties} flats={flats} summary={summary} activities={activities} onAddProperty={openCreateProperty} onEditProperty={openEditProperty} onDeleteProperty={removeProperty} onAddFlat={openCreateFlat} onAssignTenant={openAssignTenant} onSelectFlat={setSelectedFlat} onOpenProperty={(propertyId) => navigate(`/properties/${propertyId}`)} /> : <Ledger flats={filteredFlats} allFlats={flats} properties={properties} search={ledgerSearch} onSearch={setLedgerSearch} propertyFilter={propertyFilter} onPropertyFilter={setPropertyFilter} onAddFlat={openCreateFlat} onEditFlat={openEditFlatOrTenant} onDeleteFlat={removeFlat} onRecordPayment={openPayment} onSelectFlat={setSelectedFlat} onResolveExpired={openResolveExpired} onAssignTenant={() => openAssignTenant()} onVacate={vacateFlatAction} />}
         </div>
@@ -726,10 +746,10 @@ function AuthGate() {
 
 function AuthShell({ children }: { children: ReactNode }) {
   return (
-    <div className="noise flex min-h-[100dvh] items-center justify-center bg-[hsl(var(--background))] px-5">
+    <div className="noise safe-top safe-bottom safe-x flex min-h-[100dvh] items-center justify-center bg-[hsl(var(--background))] px-5">
       <div className="w-full max-w-[400px]">
         <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]"><Building2 size={19} strokeWidth={2.5} /></div>
+          <Logo />
           <div><p className="display text-[18px] font-bold tracking-[-.06em]">PropFlow</p><p className="mono text-[9px] uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">operator workspace</p></div>
         </div>
         {children}
