@@ -1,6 +1,6 @@
-# PropFlow
+# RentGrid
 
-PropFlow helps landlords manage properties, tenant assignments, rent payments, and revision reminders in one live workspace.
+RentGrid helps landlords manage properties, tenant assignments, rent payments, and revision reminders in one live workspace.
 
 ## Run & Operate
 
@@ -41,7 +41,7 @@ Landlords can create properties, assign tenants to units, edit rent, log payment
 
 ## User preferences
 
-The user requested a sleek dark-mode property management and rent tracking experience named PropFlow.
+The user requested a sleek dark-mode property management and rent tracking experience, since renamed to RentGrid.
 
 ## Gotchas
 

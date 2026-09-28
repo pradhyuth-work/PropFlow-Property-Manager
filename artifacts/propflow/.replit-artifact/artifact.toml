@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "PropFlow"
+title = "RentGrid"
 description = "A real-time property management workspace for landlords to organize properties, assign tenants, track rent payments, monitor revision dates, and export ledger data."
 version = "1.0.0"
 id = "artifacts/propflow"

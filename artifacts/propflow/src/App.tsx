@@ -399,7 +399,7 @@ function AppShell({ owner }: { owner: Owner }) {
       <aside className="safe-top safe-x hidden w-[270px] shrink-0 flex-col border-r border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar))] px-5 py-6 md:flex">
         <div className="flex items-center gap-3 px-3">
           <Logo />
-          <div><p className="display text-[18px] font-bold tracking-[-.06em] text-[hsl(var(--sidebar-foreground))]">PropFlow</p><p className="mono text-[9px] uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.5)]">operator workspace</p></div>
+          <div><p className="display text-[18px] font-bold tracking-[-.06em] text-[hsl(var(--sidebar-foreground))]">RentGrid</p><p className="mono text-[9px] uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.5)]">rent & asset control</p></div>
         </div>
         <div className="mt-12 px-3"><p className="mono mb-3 text-[9px] uppercase tracking-[.18em] text-[hsl(var(--sidebar-foreground)/.42)]">Workspace</p>
           <nav className="space-y-1">
@@ -416,7 +416,7 @@ function AppShell({ owner }: { owner: Owner }) {
           <div className="flex h-[70px] items-center justify-between px-5 sm:px-8">
             <div className="flex items-center gap-3">
               <button type="button" onClick={() => setMobileNav((open) => !open)} data-testid="button-open-navigation" aria-label="Toggle navigation" className="rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] md:hidden"><Menu size={19} /></button>
-              <div className="flex items-center gap-2.5 md:hidden"><Logo className="h-8 w-8 rounded-[10px]" iconSize={16} /><p className="display text-[15px] font-bold tracking-[-.05em] text-[hsl(var(--foreground))]">PropFlow</p></div>
+              <div className="flex items-center gap-2.5 md:hidden"><Logo className="h-8 w-8 rounded-[10px]" iconSize={16} /><p className="display text-[15px] font-bold tracking-[-.05em] text-[hsl(var(--foreground))]">RentGrid</p></div>
               <div className="hidden md:block"><p className="mono text-[10px] uppercase tracking-[.18em] text-[hsl(var(--muted-foreground))]">{activePropertyId ? 'Property detail' : todayLabel}</p><h1 className="display mt-0.5 text-[18px] font-semibold tracking-[-.035em]">{activePropertyId ? (activeProperty?.name ?? 'Property') : view === 'overview' ? `${greeting}, ${firstName}` : 'Rent ledger'}</h1></div>
             </div>
             <div className="flex items-center gap-3"><div className="hidden items-center gap-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card)/.6)] px-3 py-1.5 sm:flex"><span className={`h-1.5 w-1.5 rounded-full ${health.isError ? 'bg-[hsl(var(--destructive))]' : 'bg-[hsl(var(--primary))]'}`} /><span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{health.isError ? 'offline' : 'live sync'}</span></div><button type="button" onClick={() => openCreateProperty()} data-testid="button-header-add-property" className="hidden items-center gap-2 rounded-[9px] bg-[hsl(var(--primary))] px-3 py-2 text-[12px] font-bold text-[hsl(var(--primary-foreground))] shadow-sm transition-transform hover:-translate-y-0.5 sm:flex"><Plus size={15} />Add property</button><div className="relative"><button type="button" onClick={() => setHeaderMenuOpen((open) => !open)} data-testid="button-header-account-menu" className="flex h-8 w-8 items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[11px] font-bold text-[hsl(var(--foreground))] transition-colors hover:border-[hsl(var(--primary))]">{ownerInitials}</button><AccountMenu open={headerMenuOpen} onClose={() => setHeaderMenuOpen(false)} onOpenProfile={() => setProfileModal(true)} onLogout={doLogout} anchor="top-right" /></div></div>
@@ -758,7 +758,7 @@ function AuthShell({ children }: { children: ReactNode }) {
       <div className="w-full max-w-[400px]">
         <div className="mb-8 flex items-center gap-3">
           <Logo />
-          <div><p className="display text-[18px] font-bold tracking-[-.06em]">PropFlow</p><p className="mono text-[9px] uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">operator workspace</p></div>
+          <div><p className="display text-[18px] font-bold tracking-[-.06em]">RentGrid</p><p className="mono text-[9px] uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">rent & asset control</p></div>
         </div>
         {children}
       </div>
@@ -783,7 +783,7 @@ function SetupScreen({ onDone }: { onDone: () => void }) {
   return <AuthShell>
     <Surface className="p-6 sm:p-8">
       <h1 className="display text-[22px] font-semibold tracking-[-.04em]">Set up your workspace</h1>
-      <p className="mt-1.5 text-[13px] leading-5 text-[hsl(var(--muted-foreground))]">Create the owner account for this PropFlow workspace. You'll use this PIN to log in from now on.</p>
+      <p className="mt-1.5 text-[13px] leading-5 text-[hsl(var(--muted-foreground))]">Create the owner account for this RentGrid workspace. You'll use this PIN to log in from now on.</p>
       <form onSubmit={submit} className="mt-6 space-y-4">
         <Field label="Your name"><input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} data-testid="input-setup-name" className={inputClass()} placeholder="Aarav Shah" /></Field>
         <Field label="PIN" hint="4 digits"><input required type="password" inputMode="numeric" pattern="\d{4}" maxLength={4} value={form.pin} onChange={(event) => setForm({ ...form, pin: event.target.value.replace(/\D/g, '').slice(0, 4) })} data-testid="input-setup-pin" className={inputClass()} placeholder="••••" /></Field>
@@ -818,7 +818,7 @@ function LoginScreen({ onDone }: { onDone: () => void }) {
   return <AuthShell>
     <Surface className="p-6 sm:p-8">
       <h1 className="display text-[22px] font-semibold tracking-[-.04em]">Welcome back</h1>
-      <p className="mt-1.5 text-[13px] leading-5 text-[hsl(var(--muted-foreground))]">Enter your PIN to log in to your PropFlow workspace.</p>
+      <p className="mt-1.5 text-[13px] leading-5 text-[hsl(var(--muted-foreground))]">Enter your PIN to log in to your RentGrid workspace.</p>
       <form onSubmit={submit} className="mt-6 space-y-4">
         <Field label="PIN"><input required autoFocus type="password" inputMode="numeric" pattern="\d{4}" maxLength={4} value={pin} onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 4))} data-testid="input-login-pin" className={inputClass()} /></Field>
         {error && <p className="text-[12px] font-semibold text-[hsl(var(--destructive))]">{error}</p>}

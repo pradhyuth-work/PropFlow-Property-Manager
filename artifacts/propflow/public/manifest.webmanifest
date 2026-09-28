@@ -1,6 +1,6 @@
 {
-  "name": "PropFlow — Operator Workspace",
-  "short_name": "PropFlow",
+  "name": "RentGrid — Rent & Asset Control",
+  "short_name": "RentGrid",
   "description": "Track properties, units, tenants and rent collection in one workspace.",
   "start_url": "/",
   "scope": "/",
