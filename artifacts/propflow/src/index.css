@@ -59,7 +59,7 @@
   --sidebar-foreground: 222 24% 96%;
   --sidebar-border: 225 20% 17%;
   --sidebar-primary: 38 95% 62%;
-  --sidebar-primary-foreground: 229 27% 11%;
+  --sidebar-primary-foreground: 229 30% 5%;
   --sidebar-accent: 225 22% 13%;
   --sidebar-accent-foreground: 222 24% 96%;
   --chart-1: 239 83% 76%;
@@ -104,7 +104,7 @@
   --sidebar-foreground: 39 31% 92%;
   --sidebar-border: 224 20% 20%;
   --sidebar-primary: 42 91% 67%;
-  --sidebar-primary-foreground: 224 28% 12%;
+  --sidebar-primary-foreground: 224 30% 5%;
   --sidebar-accent: 224 22% 16%;
   --sidebar-accent-foreground: 39 38% 97%;
 }

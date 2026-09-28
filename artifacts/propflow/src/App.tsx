@@ -75,10 +75,18 @@ const navItems: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
 
 // The one brand mark for the whole app - sidebar, login/setup screens, the
 // compact mobile header. Same amber-on-navy treatment everywhere so it reads
-// as a single app identity, matching the icon used for the favicon and the
-// installable PWA icon.
+// as a single app identity, matching the favicon and installable PWA icon.
+// A simplified building outline (no window dots) - at the ~16-19px this
+// renders at in the UI, lucide's full Building glyph's 9 window dots blur
+// into the stroke; the favicon/app-icon assets get the fuller detail since
+// they're rendered much larger.
 function Logo({ className = 'h-9 w-9 rounded-[11px]', iconSize = 19 }: { className?: string; iconSize?: number }) {
-  return <div className={`flex shrink-0 items-center justify-center bg-[hsl(var(--sidebar-primary))] text-[hsl(var(--sidebar-primary-foreground))] ${className}`}><Building2 size={iconSize} strokeWidth={2.5} /></div>;
+  return <div className={`flex shrink-0 items-center justify-center bg-[hsl(var(--sidebar-primary))] text-[hsl(var(--sidebar-primary-foreground))] ${className}`}>
+    <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <path d="M9 22v-3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+    </svg>
+  </div>;
 }
 
 function AppShell({ owner }: { owner: Owner }) {
