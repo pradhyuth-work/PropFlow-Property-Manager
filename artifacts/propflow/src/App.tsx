@@ -63,6 +63,44 @@ function toLocalDateString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+function monthsBetween(from: Date, to: Date): number {
+  return (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+}
+
+// month + n, clamped to that month's last day (so a move-in on the 31st
+// anchors to e.g. the 28th/30th in shorter months, not rolling into the
+// next one).
+function addMonthsClamped(date: Date, months: number): Date {
+  const day = date.getDate();
+  const shifted = new Date(date.getFullYear(), date.getMonth() + months, 1);
+  const daysInMonth = new Date(shifted.getFullYear(), shifted.getMonth() + 1, 0).getDate();
+  shifted.setDate(Math.min(day, daysInMonth));
+  return shifted;
+}
+
+// Rent here is paid in arrears, anchored to each tenant's own move-in day
+// rather than the calendar month - a tenant who moved in on the 15th
+// completes a "month" on the 15th, not the 1st, and typically pays
+// anywhere from about a week early to ~13 days after that anniversary.
+// "Paid up" means their last payment falls on/after the grace window for
+// the most recently completed month of their tenancy.
+function isPaidForCurrentCycle(moveInDate: string | null | undefined, lastPaymentDate: string | null | undefined): boolean {
+  const move = moveInDate ? parseLocalDate(moveInDate.slice(0, 10)) : undefined;
+  if (!move) return false;
+  const now = new Date();
+  let monthsCompleted = monthsBetween(move, now);
+  let anniversary = addMonthsClamped(move, monthsCompleted);
+  if (anniversary > now) {
+    monthsCompleted -= 1;
+    anniversary = addMonthsClamped(move, monthsCompleted);
+  }
+  if (monthsCompleted <= 0) return true; // hasn't completed a first month yet - nothing due
+  const graceStart = new Date(anniversary);
+  graceStart.setDate(graceStart.getDate() - 7);
+  const paid = lastPaymentDate ? parseLocalDate(lastPaymentDate.slice(0, 10)) : undefined;
+  return !!paid && paid >= graceStart;
+}
+
 const queryClient = new QueryClient();
 
 type View = 'overview' | 'ledger';
@@ -576,8 +614,7 @@ function PropertyDetail({ property, flats, onBack, onEditProperty, onAddFlat, on
   const occupiedCount = flats.filter((flat) => flat.isOccupied).length;
   const vacantCount = flats.length - occupiedCount;
   const occupancy = property.unitCount ? Math.round((occupiedCount / property.unitCount) * 100) : 0;
-  const now = new Date();
-  const dueFlats = flats.filter((flat) => flat.isOccupied && !flat.isExpired && !(flat.lastPaymentDate && new Date(flat.lastPaymentDate).getMonth() === now.getMonth() && new Date(flat.lastPaymentDate).getFullYear() === now.getFullYear()));
+  const dueFlats = flats.filter((flat) => flat.isOccupied && !flat.isExpired && !isPaidForCurrentCycle(flat.moveInDate, flat.lastPaymentDate));
 
   return <div className="animate-rise-in space-y-6">
     {backLink}
@@ -612,7 +649,7 @@ function PropertyDetail({ property, flats, onBack, onEditProperty, onAddFlat, on
 }
 
 function PropertyUnitRow({ flat, onSelect }: { flat: Flat; onSelect: () => void }) {
-  const paidThisCycle = flat.lastPaymentDate && new Date(flat.lastPaymentDate).getMonth() === new Date().getMonth() && new Date(flat.lastPaymentDate).getFullYear() === new Date().getFullYear();
+  const paidThisCycle = isPaidForCurrentCycle(flat.moveInDate, flat.lastPaymentDate);
   return <button type="button" onClick={onSelect} data-testid={`row-property-detail-flat-${flat.id}`} className="flex w-full items-center justify-between gap-3 rounded-[10px] border border-[hsl(var(--border))] px-3.5 py-3 text-left transition-colors hover:border-[hsl(var(--primary)/.4)] hover:bg-[hsl(var(--muted)/.3)]">
     <div className="flex min-w-0 items-center gap-3">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] bg-[hsl(var(--sidebar))] text-[11px] font-bold text-[hsl(var(--sidebar-primary))]">{flat.flatNo.slice(-3)}</span>
@@ -628,14 +665,14 @@ function Ledger({ flats, allFlats, properties, search, onSearch, propertyFilter,
 }
 
 function LedgerRow({ flat, onEdit, onDelete, onPay, onSelect, onResolve, onAssignTenant, onVacate }: { flat: Flat; onEdit: () => void; onDelete: () => void; onPay: () => void; onSelect: () => void; onResolve: () => void; onAssignTenant: () => void; onVacate: () => void }) {
-  const paidThisCycle = flat.lastPaymentDate && new Date(flat.lastPaymentDate).getMonth() === new Date().getMonth();
+  const paidThisCycle = isPaidForCurrentCycle(flat.moveInDate, flat.lastPaymentDate);
   return <tr data-testid={`row-ledger-${flat.id}`} className="group border-b border-[hsl(var(--border)/.7)] last:border-0 transition-colors hover:bg-[hsl(var(--muted)/.38)]"><td className="max-w-[220px] px-5 py-4"><button type="button" onClick={onSelect} data-testid={`button-open-flat-${flat.id}`} className="flex w-full min-w-0 items-center gap-3 text-left"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] bg-[hsl(var(--sidebar))] text-[11px] font-bold text-[hsl(var(--sidebar-primary))]">{flat.flatNo.slice(-3)}</span><span className="min-w-0"><span className="block truncate text-[12px] font-bold">{flat.tenantName ?? 'Vacant'}</span><span className="mt-0.5 block truncate text-[10px] text-[hsl(var(--muted-foreground))]">{flat.propertyName} · {flat.flatNo}</span></span></button></td><td className="px-3 py-4 mono text-[12px] font-medium">{flat.rent != null ? formatMoney(flat.rent) : '—'}</td><td className="px-3 py-4 mono text-[12px] font-medium">{formatMoney(flat.totalPaid)}</td><td className="px-3 py-4 text-[11px] text-[hsl(var(--muted-foreground))]">{formatDate(flat.lastPaymentDate, true)}</td><td className="px-3 py-4">{!flat.isOccupied ? <span className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px] font-bold text-[hsl(var(--muted-foreground))]"><span className="h-1.5 w-1.5 rounded-full bg-current" />Vacant</span> : flat.isExpired ? <span className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--destructive)/.14)] px-2 py-1 text-[10px] font-bold text-[hsl(var(--destructive))]"><span className="h-1.5 w-1.5 rounded-full bg-current" />Expired</span> : <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-bold ${paidThisCycle ? 'bg-[hsl(var(--primary)/.16)] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--accent)/.16)] text-[hsl(var(--accent-foreground))]'}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{paidThisCycle ? 'Paid' : 'Due'}</span>}</td><td className="px-5 py-4"><div className="flex justify-end gap-1">{!flat.isOccupied ? <button type="button" onClick={onAssignTenant} data-testid={`button-assign-tenant-flat-${flat.id}`} className="rounded-[7px] bg-[hsl(var(--primary)/.13)] px-2.5 py-1.5 text-[10px] font-bold text-[hsl(var(--primary-foreground))] transition-colors hover:bg-[hsl(var(--primary)/.24)]">Assign tenant</button> : flat.isExpired ? <button type="button" onClick={onResolve} data-testid={`button-resolve-flat-${flat.id}`} className="rounded-[7px] bg-[hsl(var(--destructive)/.13)] px-2.5 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] transition-colors hover:bg-[hsl(var(--destructive)/.22)]">Resolve</button> : <button type="button" onClick={onPay} data-testid={`button-record-payment-${flat.id}`} className="rounded-[7px] bg-[hsl(var(--primary)/.13)] px-2.5 py-1.5 text-[10px] font-bold text-[hsl(var(--primary-foreground))] transition-colors hover:bg-[hsl(var(--primary)/.24)]">Record payment</button>}{flat.isOccupied && <button type="button" onClick={onVacate} data-testid={`button-vacate-flat-${flat.id}`} title="Vacate unit" className="rounded-md p-1.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"><UserMinus size={14} /></button>}<button type="button" onClick={onEdit} data-testid={`button-edit-flat-${flat.id}`} className="rounded-md p-1.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"><Pencil size={14} /></button><button type="button" onClick={onDelete} data-testid={`button-delete-flat-${flat.id}`} title="Delete unit" className="rounded-md p-1.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--destructive)/.1)] hover:text-[hsl(var(--destructive))]"><Trash2 size={14} /></button></div></td></tr>;
 }
 
 // The table's columns don't fit a phone screen - this is the same row's
 // data as a stacked card instead, used below the md breakpoint.
 function LedgerCard({ flat, onEdit, onDelete, onPay, onSelect, onResolve, onAssignTenant, onVacate }: { flat: Flat; onEdit: () => void; onDelete: () => void; onPay: () => void; onSelect: () => void; onResolve: () => void; onAssignTenant: () => void; onVacate: () => void }) {
-  const paidThisCycle = flat.lastPaymentDate && new Date(flat.lastPaymentDate).getMonth() === new Date().getMonth();
+  const paidThisCycle = isPaidForCurrentCycle(flat.moveInDate, flat.lastPaymentDate);
   return <div data-testid={`card-ledger-${flat.id}`} className="p-4">
     <button type="button" onClick={onSelect} data-testid={`button-open-flat-${flat.id}`} className="flex w-full items-center gap-3 text-left">
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] bg-[hsl(var(--sidebar))] text-[11px] font-bold text-[hsl(var(--sidebar-primary))]">{flat.flatNo.slice(-3)}</span>
