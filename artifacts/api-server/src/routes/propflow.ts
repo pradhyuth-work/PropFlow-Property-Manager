@@ -294,7 +294,7 @@ router.get("/dashboard/summary", async (_req, res, next) => {
     const result = await pool.query(`SELECT
       COALESCE(SUM(rent),0) AS expected, COUNT(*) FILTER (WHERE tenant_name IS NOT NULL)::int AS occupied,
       COUNT(*)::int AS total_units, (SELECT COUNT(*)::int FROM properties WHERE deleted_at IS NULL) AS properties_count,
-      COALESCE((SELECT SUM(amount) FROM payments),0) AS collected,
+      COALESCE((SELECT SUM(amount) FROM payments WHERE date_trunc('month', payment_date) = date_trunc('month', CURRENT_DATE)),0) AS collected,
       COUNT(*) FILTER (WHERE move_in_date IS NOT NULL AND move_in_date <= CURRENT_DATE - INTERVAL '11 months')::int AS due
       FROM flats WHERE deleted_at IS NULL`);
     const row = result.rows[0];
