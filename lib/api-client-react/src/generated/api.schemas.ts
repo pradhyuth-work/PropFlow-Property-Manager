@@ -36,6 +36,40 @@ export interface PropertyUpdate {
   address?: string;
 }
 
+export type CycleStatus = typeof CycleStatus[keyof typeof CycleStatus];
+
+
+export const CycleStatus = {
+  paid: 'paid',
+  due: 'due',
+  'part-paid': 'part-paid',
+} as const;
+
+export interface Payment {
+  id: string;
+  createdAt: string;
+  flatId: string;
+  paymentDate: string;
+  /** @minimum 0 */
+  amount: number;
+  /**
+     * First day of the calendar-month rent cycle this payment covers - not necessarily the month of paymentDate, since rent is paid in arrears
+     * @nullable
+     */
+  cycleMonth: string | null;
+}
+
+export interface FlatCycle {
+  /** First day of the cycle's month */
+  cycleMonth: string;
+  status: CycleStatus;
+  /** The unit's current rent, used as this cycle's expected amount */
+  rentDue: number;
+  /** Sum of payments assigned to this cycle */
+  totalPaid: number;
+  payments: Payment[];
+}
+
 export interface Flat {
   id: string;
   createdAt: string;
@@ -65,6 +99,15 @@ export interface Flat {
   totalPaid: number;
   /** @nullable */
   lastPaymentDate: string | null;
+  /** Every completed calendar-month rent cycle from move-in month through the last month that has fully ended, oldest first. Empty for a vacant unit or a tenant who hasn't completed a first month yet. */
+  cycles: FlatCycle[];
+  /**
+     * First day of the oldest cycle that is not fully paid (due or part-paid), or null if every cycle is paid
+     * @nullable
+     */
+  oldestDueCycle: string | null;
+  /** Count of cycles that are due or part-paid */
+  dueCycleCount: number;
 }
 
 /**
@@ -109,19 +152,12 @@ export interface RenewFlatInput {
   rent: number;
 }
 
-export interface Payment {
-  id: string;
-  createdAt: string;
-  flatId: string;
-  paymentDate: string;
-  /** @minimum 0 */
-  amount: number;
-}
-
 export interface PaymentInput {
   paymentDate: string;
   /** @minimum 0 */
   amount: number;
+  /** First day of the calendar-month rent cycle this payment covers */
+  cycleMonth: string;
 }
 
 export interface DashboardSummary {

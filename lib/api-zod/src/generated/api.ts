@@ -191,6 +191,10 @@ export const ListFlatsQueryParams = zod.object({
   "propertyId": zod.coerce.string().optional()
 })
 
+export const listFlatsResponseCyclesItemPaymentsItemAmountMin = 0;
+
+
+
 export const ListFlatsResponseItem = zod.object({
   "id": zod.string(),
   "createdAt": zod.coerce.date(),
@@ -208,7 +212,23 @@ export const ListFlatsResponseItem = zod.object({
   "deposit": zod.number().nullable(),
   "rent": zod.number().nullable(),
   "totalPaid": zod.number(),
-  "lastPaymentDate": zod.coerce.date().nullable()
+  "lastPaymentDate": zod.coerce.date().nullable(),
+  "cycles": zod.array(zod.object({
+  "cycleMonth": zod.coerce.date().describe('First day of the cycle\'s month'),
+  "status": zod.enum(['paid', 'due', 'part-paid']),
+  "rentDue": zod.number().describe('The unit\'s current rent, used as this cycle\'s expected amount'),
+  "totalPaid": zod.number().describe('Sum of payments assigned to this cycle'),
+  "payments": zod.array(zod.object({
+  "id": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "flatId": zod.string(),
+  "paymentDate": zod.coerce.date(),
+  "amount": zod.number().min(listFlatsResponseCyclesItemPaymentsItemAmountMin),
+  "cycleMonth": zod.coerce.date().nullable().describe('First day of the calendar-month rent cycle this payment covers - not necessarily the month of paymentDate, since rent is paid in arrears')
+}))
+})).describe('Every completed calendar-month rent cycle from move-in month through the last month that has fully ended, oldest first. Empty for a vacant unit or a tenant who hasn\'t completed a first month yet.'),
+  "oldestDueCycle": zod.coerce.date().nullable().describe('First day of the oldest cycle that is not fully paid (due or part-paid), or null if every cycle is paid'),
+  "dueCycleCount": zod.number().describe('Count of cycles that are due or part-paid')
 })
 export const ListFlatsResponse = zod.array(ListFlatsResponseItem)
 
@@ -237,6 +257,10 @@ export const CreateFlatBody = zod.object({
   "rent": zod.number().min(createFlatBodyRentMin).optional()
 }).describe('Creates a unit. Tenant fields are optional here - a unit is usually created empty and a tenant assigned to it later.')
 
+export const createFlatResponseCyclesItemPaymentsItemAmountMin = 0;
+
+
+
 export const CreateFlatResponse = zod.object({
   "id": zod.string(),
   "createdAt": zod.coerce.date(),
@@ -254,7 +278,23 @@ export const CreateFlatResponse = zod.object({
   "deposit": zod.number().nullable(),
   "rent": zod.number().nullable(),
   "totalPaid": zod.number(),
-  "lastPaymentDate": zod.coerce.date().nullable()
+  "lastPaymentDate": zod.coerce.date().nullable(),
+  "cycles": zod.array(zod.object({
+  "cycleMonth": zod.coerce.date().describe('First day of the cycle\'s month'),
+  "status": zod.enum(['paid', 'due', 'part-paid']),
+  "rentDue": zod.number().describe('The unit\'s current rent, used as this cycle\'s expected amount'),
+  "totalPaid": zod.number().describe('Sum of payments assigned to this cycle'),
+  "payments": zod.array(zod.object({
+  "id": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "flatId": zod.string(),
+  "paymentDate": zod.coerce.date(),
+  "amount": zod.number().min(createFlatResponseCyclesItemPaymentsItemAmountMin),
+  "cycleMonth": zod.coerce.date().nullable().describe('First day of the calendar-month rent cycle this payment covers - not necessarily the month of paymentDate, since rent is paid in arrears')
+}))
+})).describe('Every completed calendar-month rent cycle from move-in month through the last month that has fully ended, oldest first. Empty for a vacant unit or a tenant who hasn\'t completed a first month yet.'),
+  "oldestDueCycle": zod.coerce.date().nullable().describe('First day of the oldest cycle that is not fully paid (due or part-paid), or null if every cycle is paid'),
+  "dueCycleCount": zod.number().describe('Count of cycles that are due or part-paid')
 })
 
 
@@ -285,6 +325,10 @@ export const UpdateFlatBody = zod.object({
   "rent": zod.number().min(updateFlatBodyRentMin).optional()
 })
 
+export const updateFlatResponseCyclesItemPaymentsItemAmountMin = 0;
+
+
+
 export const UpdateFlatResponse = zod.object({
   "id": zod.string(),
   "createdAt": zod.coerce.date(),
@@ -302,7 +346,23 @@ export const UpdateFlatResponse = zod.object({
   "deposit": zod.number().nullable(),
   "rent": zod.number().nullable(),
   "totalPaid": zod.number(),
-  "lastPaymentDate": zod.coerce.date().nullable()
+  "lastPaymentDate": zod.coerce.date().nullable(),
+  "cycles": zod.array(zod.object({
+  "cycleMonth": zod.coerce.date().describe('First day of the cycle\'s month'),
+  "status": zod.enum(['paid', 'due', 'part-paid']),
+  "rentDue": zod.number().describe('The unit\'s current rent, used as this cycle\'s expected amount'),
+  "totalPaid": zod.number().describe('Sum of payments assigned to this cycle'),
+  "payments": zod.array(zod.object({
+  "id": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "flatId": zod.string(),
+  "paymentDate": zod.coerce.date(),
+  "amount": zod.number().min(updateFlatResponseCyclesItemPaymentsItemAmountMin),
+  "cycleMonth": zod.coerce.date().nullable().describe('First day of the calendar-month rent cycle this payment covers - not necessarily the month of paymentDate, since rent is paid in arrears')
+}))
+})).describe('Every completed calendar-month rent cycle from move-in month through the last month that has fully ended, oldest first. Empty for a vacant unit or a tenant who hasn\'t completed a first month yet.'),
+  "oldestDueCycle": zod.coerce.date().nullable().describe('First day of the oldest cycle that is not fully paid (due or part-paid), or null if every cycle is paid'),
+  "dueCycleCount": zod.number().describe('Count of cycles that are due or part-paid')
 })
 
 
@@ -332,6 +392,10 @@ export const RenewFlatBody = zod.object({
   "rent": zod.number().min(renewFlatBodyRentMin)
 })
 
+export const renewFlatResponseCyclesItemPaymentsItemAmountMin = 0;
+
+
+
 export const RenewFlatResponse = zod.object({
   "id": zod.string(),
   "createdAt": zod.coerce.date(),
@@ -349,7 +413,23 @@ export const RenewFlatResponse = zod.object({
   "deposit": zod.number().nullable(),
   "rent": zod.number().nullable(),
   "totalPaid": zod.number(),
-  "lastPaymentDate": zod.coerce.date().nullable()
+  "lastPaymentDate": zod.coerce.date().nullable(),
+  "cycles": zod.array(zod.object({
+  "cycleMonth": zod.coerce.date().describe('First day of the cycle\'s month'),
+  "status": zod.enum(['paid', 'due', 'part-paid']),
+  "rentDue": zod.number().describe('The unit\'s current rent, used as this cycle\'s expected amount'),
+  "totalPaid": zod.number().describe('Sum of payments assigned to this cycle'),
+  "payments": zod.array(zod.object({
+  "id": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "flatId": zod.string(),
+  "paymentDate": zod.coerce.date(),
+  "amount": zod.number().min(renewFlatResponseCyclesItemPaymentsItemAmountMin),
+  "cycleMonth": zod.coerce.date().nullable().describe('First day of the calendar-month rent cycle this payment covers - not necessarily the month of paymentDate, since rent is paid in arrears')
+}))
+})).describe('Every completed calendar-month rent cycle from move-in month through the last month that has fully ended, oldest first. Empty for a vacant unit or a tenant who hasn\'t completed a first month yet.'),
+  "oldestDueCycle": zod.coerce.date().nullable().describe('First day of the oldest cycle that is not fully paid (due or part-paid), or null if every cycle is paid'),
+  "dueCycleCount": zod.number().describe('Count of cycles that are due or part-paid')
 })
 
 
@@ -359,6 +439,10 @@ export const RenewFlatResponse = zod.object({
 export const VacateFlatParams = zod.object({
   "id": zod.coerce.string()
 })
+
+export const vacateFlatResponseCyclesItemPaymentsItemAmountMin = 0;
+
+
 
 export const VacateFlatResponse = zod.object({
   "id": zod.string(),
@@ -377,7 +461,23 @@ export const VacateFlatResponse = zod.object({
   "deposit": zod.number().nullable(),
   "rent": zod.number().nullable(),
   "totalPaid": zod.number(),
-  "lastPaymentDate": zod.coerce.date().nullable()
+  "lastPaymentDate": zod.coerce.date().nullable(),
+  "cycles": zod.array(zod.object({
+  "cycleMonth": zod.coerce.date().describe('First day of the cycle\'s month'),
+  "status": zod.enum(['paid', 'due', 'part-paid']),
+  "rentDue": zod.number().describe('The unit\'s current rent, used as this cycle\'s expected amount'),
+  "totalPaid": zod.number().describe('Sum of payments assigned to this cycle'),
+  "payments": zod.array(zod.object({
+  "id": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "flatId": zod.string(),
+  "paymentDate": zod.coerce.date(),
+  "amount": zod.number().min(vacateFlatResponseCyclesItemPaymentsItemAmountMin),
+  "cycleMonth": zod.coerce.date().nullable().describe('First day of the calendar-month rent cycle this payment covers - not necessarily the month of paymentDate, since rent is paid in arrears')
+}))
+})).describe('Every completed calendar-month rent cycle from move-in month through the last month that has fully ended, oldest first. Empty for a vacant unit or a tenant who hasn\'t completed a first month yet.'),
+  "oldestDueCycle": zod.coerce.date().nullable().describe('First day of the oldest cycle that is not fully paid (due or part-paid), or null if every cycle is paid'),
+  "dueCycleCount": zod.number().describe('Count of cycles that are due or part-paid')
 })
 
 
@@ -397,7 +497,8 @@ export const ListFlatPaymentsResponseItem = zod.object({
   "createdAt": zod.coerce.date(),
   "flatId": zod.string(),
   "paymentDate": zod.coerce.date(),
-  "amount": zod.number().min(listFlatPaymentsResponseAmountMin)
+  "amount": zod.number().min(listFlatPaymentsResponseAmountMin),
+  "cycleMonth": zod.coerce.date().nullable().describe('First day of the calendar-month rent cycle this payment covers - not necessarily the month of paymentDate, since rent is paid in arrears')
 })
 export const ListFlatPaymentsResponse = zod.array(ListFlatPaymentsResponseItem)
 
@@ -415,7 +516,8 @@ export const createPaymentBodyAmountMin = 0;
 
 export const CreatePaymentBody = zod.object({
   "paymentDate": zod.coerce.date(),
-  "amount": zod.number().min(createPaymentBodyAmountMin)
+  "amount": zod.number().min(createPaymentBodyAmountMin),
+  "cycleMonth": zod.coerce.date().describe('First day of the calendar-month rent cycle this payment covers')
 })
 
 export const createPaymentResponseAmountMin = 0;
@@ -427,7 +529,8 @@ export const CreatePaymentResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "flatId": zod.string(),
   "paymentDate": zod.coerce.date(),
-  "amount": zod.number().min(createPaymentResponseAmountMin)
+  "amount": zod.number().min(createPaymentResponseAmountMin),
+  "cycleMonth": zod.coerce.date().nullable().describe('First day of the calendar-month rent cycle this payment covers - not necessarily the month of paymentDate, since rent is paid in arrears')
 })
 
 

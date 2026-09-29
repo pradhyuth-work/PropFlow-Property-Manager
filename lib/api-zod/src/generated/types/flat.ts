@@ -5,6 +5,7 @@
  * RentGrid property management API
  * OpenAPI spec version: 0.1.0
  */
+import type { FlatCycle } from './flatCycle';
 
 export interface Flat {
   id: string;
@@ -35,4 +36,13 @@ export interface Flat {
   totalPaid: number;
   /** @nullable */
   lastPaymentDate: Date | null;
+  /** Every completed calendar-month rent cycle from move-in month through the last month that has fully ended, oldest first. Empty for a vacant unit or a tenant who hasn't completed a first month yet. */
+  cycles: FlatCycle[];
+  /**
+     * First day of the oldest cycle that is not fully paid (due or part-paid), or null if every cycle is paid
+     * @nullable
+     */
+  oldestDueCycle: Date | null;
+  /** Count of cycles that are due or part-paid */
+  dueCycleCount: number;
 }

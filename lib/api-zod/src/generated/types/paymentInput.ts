@@ -10,4 +10,6 @@ export interface PaymentInput {
   paymentDate: Date;
   /** @minimum 0 */
   amount: number;
+  /** First day of the calendar-month rent cycle this payment covers */
+  cycleMonth: Date;
 }

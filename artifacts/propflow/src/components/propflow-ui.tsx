@@ -85,3 +85,9 @@ export function formatDate(value: string | null | undefined, withYear = false) {
     ...(isCalendarDate ? { timeZone: 'UTC' } : {}),
   }).format(date);
 }
+
+// A cycleMonth is always the 1st of its month (see formatDate above for why
+// UTC components, not local ones), so this only ever needs month + year.
+export function formatCycleMonth(value: string) {
+  return new Intl.DateTimeFormat('en-IN', { month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(value));
+}

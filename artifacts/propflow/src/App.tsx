@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/reac
 import { Activity, ArrowDownRight, ArrowLeft, ArrowUpRight, Building2, CalendarRange, Check, ChevronRight, CircleDollarSign, ClipboardList, Home, LayoutDashboard, LogOut, Menu, MoreHorizontal, Pencil, Plus, ReceiptIndianRupee, Search, Sparkles, Trash2, UserCog, UserMinus, UserPlus, WalletCards, X } from 'lucide-react';
 import type { DateRange } from 'react-day-picker';
 import { ErrorBoundary } from '@/components/error-boundary';
-import { EmptyState, Field, formatDate, formatMoney, Modal, SectionTitle, SkeletonRows, Surface, inputClass } from '@/components/propflow-ui';
+import { EmptyState, Field, formatCycleMonth, formatDate, formatMoney, Modal, SectionTitle, SkeletonRows, Surface, inputClass } from '@/components/propflow-ui';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import NotFound from '@/pages/not-found';
@@ -39,6 +39,7 @@ import {
   useUpdateProperty,
   useVacateFlat,
   type Flat,
+  type FlatCycle,
   type Owner,
   type Property,
 } from '@workspace/api-client-react';
@@ -63,42 +64,49 @@ function toLocalDateString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function monthsBetween(from: Date, to: Date): number {
-  return (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+// "YYYY-MM", from a local Date - used only for generating the "Rent for"
+// picker's options and its default. Status (Paid/Due/Part-paid) itself is
+// never computed client-side - the server returns each flat's cycles,
+// oldestDueCycle and dueCycleCount already resolved, anchored to Postgres's
+// CURRENT_DATE rather than the viewer's clock.
+function monthKeyLocal(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
-// month + n, clamped to that month's last day (so a move-in on the 31st
-// anchors to e.g. the 28th/30th in shorter months, not rolling into the
-// next one).
-function addMonthsClamped(date: Date, months: number): Date {
-  const day = date.getDate();
-  const shifted = new Date(date.getFullYear(), date.getMonth() + months, 1);
-  const daysInMonth = new Date(shifted.getFullYear(), shifted.getMonth() + 1, 0).getDate();
-  shifted.setDate(Math.min(day, daysInMonth));
-  return shifted;
+function addMonthKeyLocal(key: string, delta: number): string {
+  const [year, month] = key.split('-').map(Number);
+  const total = year * 12 + (month - 1) + delta;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
 }
 
-// Rent here is paid in arrears, anchored to each tenant's own move-in day
-// rather than the calendar month - a tenant who moved in on the 15th
-// completes a "month" on the 15th, not the 1st, and typically pays
-// anywhere from about a week early to ~13 days after that anniversary.
-// "Paid up" means their last payment falls on/after the grace window for
-// the most recently completed month of their tenancy.
-function isPaidForCurrentCycle(moveInDate: string | null | undefined, lastPaymentDate: string | null | undefined): boolean {
+// Every month from the tenant's move-in month through one month past the
+// current one, oldest first - covers the full overdue backlog plus a little
+// room for a genuinely early payment, without offering an unbounded list of
+// future months.
+function generateCycleOptions(moveInDate: string | null | undefined): { value: string; label: string }[] {
   const move = moveInDate ? parseLocalDate(moveInDate.slice(0, 10)) : undefined;
-  if (!move) return false;
-  const now = new Date();
-  let monthsCompleted = monthsBetween(move, now);
-  let anniversary = addMonthsClamped(move, monthsCompleted);
-  if (anniversary > now) {
-    monthsCompleted -= 1;
-    anniversary = addMonthsClamped(move, monthsCompleted);
+  if (!move) return [];
+  const endKey = addMonthKeyLocal(monthKeyLocal(new Date()), 1);
+  const options: { value: string; label: string }[] = [];
+  for (let cursor = monthKeyLocal(move); cursor <= endKey; cursor = addMonthKeyLocal(cursor, 1)) {
+    const value = `${cursor}-01`;
+    options.push({ value, label: formatCycleMonth(value) });
   }
-  if (monthsCompleted <= 0) return true; // hasn't completed a first month yet - nothing due
-  const graceStart = new Date(anniversary);
-  graceStart.setDate(graceStart.getDate() - 7);
-  const paid = lastPaymentDate ? parseLocalDate(lastPaymentDate.slice(0, 10)) : undefined;
-  return !!paid && paid >= graceStart;
+  return options;
+}
+
+// "Due: Aug 2026" or "Due: Jul, Aug 2026" - months sharing a year fold into
+// one trailing year; a due list spanning a year boundary falls back to a
+// fully-qualified month per entry.
+function formatDueCyclesLabel(cycles: FlatCycle[]): string {
+  const due = cycles.filter((cycle) => cycle.status !== 'paid');
+  if (!due.length) return '';
+  const years = new Set(due.map((cycle) => new Date(cycle.cycleMonth).getUTCFullYear()));
+  if (years.size === 1) {
+    const months = due.map((cycle) => new Intl.DateTimeFormat('en-IN', { month: 'short', timeZone: 'UTC' }).format(new Date(cycle.cycleMonth)));
+    return `Due: ${months.join(', ')} ${[...years][0]}`;
+  }
+  return `Due: ${due.map((cycle) => formatCycleMonth(cycle.cycleMonth)).join(', ')}`;
 }
 
 const queryClient = new QueryClient();
@@ -137,7 +145,7 @@ function AppShell({ owner }: { owner: Owner }) {
   const [flatForm, setFlatForm] = useState({ propertyId: '', flatNo: '' });
   const [tenantForm, setTenantForm] = useState({ propertyId: '', flatId: '', tenantName: '', workplace: '', govtId: '', phone: '', moveInDate: '', tenureEnd: '', deposit: '', rent: '' });
   const [tenantPropertyLocked, setTenantPropertyLocked] = useState(false);
-  const [paymentForm, setPaymentForm] = useState({ paymentDate: new Date().toISOString().slice(0, 10), amount: '' });
+  const [paymentForm, setPaymentForm] = useState({ paymentDate: new Date().toISOString().slice(0, 10), amount: '', cycleMonth: '' });
   const [expiredFlat, setExpiredFlat] = useState<Flat | null>(null);
   const [renewForm, setRenewForm] = useState({ tenureEnd: '', rent: '' });
   const [ledgerSearch, setLedgerSearch] = useState('');
@@ -365,14 +373,18 @@ function AppShell({ owner }: { owner: Owner }) {
 
   const openPayment = (flat: Flat) => {
     setSelectedFlat(flat);
-    setPaymentForm({ paymentDate: new Date().toISOString().slice(0, 10), amount: flat.rent != null ? String(flat.rent) : '' });
+    // Default to the oldest unpaid completed cycle - if the tenant is
+    // already paid up, default to the current (in-progress) month instead,
+    // since that's the next one they'd plausibly be paying early for.
+    const currentMonthIso = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`;
+    setPaymentForm({ paymentDate: new Date().toISOString().slice(0, 10), amount: flat.rent != null ? String(flat.rent) : '', cycleMonth: flat.oldestDueCycle?.slice(0, 10) ?? currentMonthIso });
     setPaymentModal(true);
   };
 
   const submitPayment = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!selectedFlat || !paymentForm.amount) return;
-    createPayment.mutate({ id: selectedFlat.id, data: { paymentDate: paymentForm.paymentDate, amount: Number(paymentForm.amount) } }, {
+    if (!selectedFlat || !paymentForm.amount || !paymentForm.cycleMonth) return;
+    createPayment.mutate({ id: selectedFlat.id, data: { paymentDate: paymentForm.paymentDate, amount: Number(paymentForm.amount), cycleMonth: paymentForm.cycleMonth } }, {
       onSuccess: () => {
         setPaymentModal(false);
         refreshOverview();
@@ -614,7 +626,7 @@ function PropertyDetail({ property, flats, onBack, onEditProperty, onAddFlat, on
   const occupiedCount = flats.filter((flat) => flat.isOccupied).length;
   const vacantCount = flats.length - occupiedCount;
   const occupancy = property.unitCount ? Math.round((occupiedCount / property.unitCount) * 100) : 0;
-  const dueFlats = flats.filter((flat) => flat.isOccupied && !flat.isExpired && !isPaidForCurrentCycle(flat.moveInDate, flat.lastPaymentDate));
+  const dueFlats = flats.filter((flat) => flat.isOccupied && !flat.isExpired && flat.dueCycleCount > 0);
 
   return <div className="animate-rise-in space-y-6">
     {backLink}
@@ -642,18 +654,18 @@ function PropertyDetail({ property, flats, onBack, onEditProperty, onAddFlat, on
       </Surface>
       <Surface className="p-5 sm:p-6">
         <SectionTitle eyebrow="Collections" title="Rents due" />
-        {dueFlats.length ? <div className="space-y-2">{dueFlats.map((flat) => <div key={flat.id} data-testid={`due-${flat.id}`} className="flex items-center justify-between gap-3 rounded-[9px] border border-[hsl(var(--border))] px-3.5 py-3"><div className="min-w-0"><p className="truncate text-[12px] font-bold">{flat.tenantName}</p><p className="mt-0.5 text-[10px] text-[hsl(var(--muted-foreground))]">{flat.flatNo}</p></div><div className="flex shrink-0 items-center gap-2"><span className="mono text-[12px] font-medium">{formatMoney(flat.rent ?? undefined)}</span><button type="button" onClick={() => onRecordPayment(flat)} data-testid={`button-due-pay-${flat.id}`} className="rounded-[7px] bg-[hsl(var(--primary)/.13)] px-2.5 py-1.5 text-[10px] font-bold text-[hsl(var(--primary-foreground))] transition-colors hover:bg-[hsl(var(--primary)/.24)]">Record payment</button></div></div>)}</div> : <EmptyState title="Nothing due" description="Every occupied unit here is paid up for this cycle." />}
+        {dueFlats.length ? <div className="space-y-2">{dueFlats.map((flat) => <div key={flat.id} data-testid={`due-${flat.id}`} className="flex items-center justify-between gap-3 rounded-[9px] border border-[hsl(var(--border))] px-3.5 py-3"><div className="min-w-0"><p className="truncate text-[12px] font-bold">{flat.tenantName}</p><p className="mt-0.5 text-[10px] text-[hsl(var(--muted-foreground))]">{flat.flatNo} · {formatDueCyclesLabel(flat.cycles)}</p></div><div className="flex shrink-0 items-center gap-2"><span className="mono text-[12px] font-medium">{formatMoney(flat.rent ?? undefined)}</span><button type="button" onClick={() => onRecordPayment(flat)} data-testid={`button-due-pay-${flat.id}`} className="rounded-[7px] bg-[hsl(var(--primary)/.13)] px-2.5 py-1.5 text-[10px] font-bold text-[hsl(var(--primary-foreground))] transition-colors hover:bg-[hsl(var(--primary)/.24)]">Record payment</button></div></div>)}</div> : <EmptyState title="Nothing due" description="Every occupied unit here is paid up for this cycle." />}
       </Surface>
     </section>
   </div>;
 }
 
 function PropertyUnitRow({ flat, onSelect }: { flat: Flat; onSelect: () => void }) {
-  const paidThisCycle = isPaidForCurrentCycle(flat.moveInDate, flat.lastPaymentDate);
+  const paidThisCycle = flat.dueCycleCount === 0;
   return <button type="button" onClick={onSelect} data-testid={`row-property-detail-flat-${flat.id}`} className="flex w-full items-center justify-between gap-3 rounded-[10px] border border-[hsl(var(--border))] px-3.5 py-3 text-left transition-colors hover:border-[hsl(var(--primary)/.4)] hover:bg-[hsl(var(--muted)/.3)]">
     <div className="flex min-w-0 items-center gap-3">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] bg-[hsl(var(--sidebar))] text-[11px] font-bold text-[hsl(var(--sidebar-primary))]">{flat.flatNo.slice(-3)}</span>
-      <span className="min-w-0"><span className="block truncate text-[12px] font-bold">{flat.flatNo}{flat.tenantName ? ` · ${flat.tenantName}` : ''}</span><span className="mt-0.5 block text-[10px] text-[hsl(var(--muted-foreground))]">{flat.isOccupied ? `${formatMoney(flat.rent ?? undefined)} / month` : 'No tenant mapped'}</span></span>
+      <span className="min-w-0"><span className="block truncate text-[12px] font-bold">{flat.flatNo}{flat.tenantName ? ` · ${flat.tenantName}` : ''}</span><span className="mt-0.5 block text-[10px] text-[hsl(var(--muted-foreground))]">{flat.isOccupied ? (!paidThisCycle ? formatDueCyclesLabel(flat.cycles) : `${formatMoney(flat.rent ?? undefined)} / month`) : 'No tenant mapped'}</span></span>
     </div>
     {!flat.isOccupied ? <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px] font-bold text-[hsl(var(--muted-foreground))]"><span className="h-1.5 w-1.5 rounded-full bg-current" />Vacant</span> : flat.isExpired ? <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[hsl(var(--destructive)/.14)] px-2 py-1 text-[10px] font-bold text-[hsl(var(--destructive))]"><span className="h-1.5 w-1.5 rounded-full bg-current" />Expired</span> : <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-bold ${paidThisCycle ? 'bg-[hsl(var(--primary)/.16)] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--accent)/.16)] text-[hsl(var(--accent-foreground))]'}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{paidThisCycle ? 'Paid' : 'Due'}</span>}
   </button>;
@@ -665,14 +677,14 @@ function Ledger({ flats, allFlats, properties, search, onSearch, propertyFilter,
 }
 
 function LedgerRow({ flat, onEdit, onDelete, onPay, onSelect, onResolve, onAssignTenant, onVacate }: { flat: Flat; onEdit: () => void; onDelete: () => void; onPay: () => void; onSelect: () => void; onResolve: () => void; onAssignTenant: () => void; onVacate: () => void }) {
-  const paidThisCycle = isPaidForCurrentCycle(flat.moveInDate, flat.lastPaymentDate);
-  return <tr data-testid={`row-ledger-${flat.id}`} className="group border-b border-[hsl(var(--border)/.7)] last:border-0 transition-colors hover:bg-[hsl(var(--muted)/.38)]"><td className="max-w-[220px] px-5 py-4"><button type="button" onClick={onSelect} data-testid={`button-open-flat-${flat.id}`} className="flex w-full min-w-0 items-center gap-3 text-left"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] bg-[hsl(var(--sidebar))] text-[11px] font-bold text-[hsl(var(--sidebar-primary))]">{flat.flatNo.slice(-3)}</span><span className="min-w-0"><span className="block truncate text-[12px] font-bold">{flat.tenantName ?? 'Vacant'}</span><span className="mt-0.5 block truncate text-[10px] text-[hsl(var(--muted-foreground))]">{flat.propertyName} · {flat.flatNo}</span></span></button></td><td className="px-3 py-4 mono text-[12px] font-medium">{flat.rent != null ? formatMoney(flat.rent) : '—'}</td><td className="px-3 py-4 mono text-[12px] font-medium">{formatMoney(flat.totalPaid)}</td><td className="px-3 py-4 text-[11px] text-[hsl(var(--muted-foreground))]">{formatDate(flat.lastPaymentDate, true)}</td><td className="px-3 py-4">{!flat.isOccupied ? <span className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px] font-bold text-[hsl(var(--muted-foreground))]"><span className="h-1.5 w-1.5 rounded-full bg-current" />Vacant</span> : flat.isExpired ? <span className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--destructive)/.14)] px-2 py-1 text-[10px] font-bold text-[hsl(var(--destructive))]"><span className="h-1.5 w-1.5 rounded-full bg-current" />Expired</span> : <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-bold ${paidThisCycle ? 'bg-[hsl(var(--primary)/.16)] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--accent)/.16)] text-[hsl(var(--accent-foreground))]'}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{paidThisCycle ? 'Paid' : 'Due'}</span>}</td><td className="px-5 py-4"><div className="flex justify-end gap-1">{!flat.isOccupied ? <button type="button" onClick={onAssignTenant} data-testid={`button-assign-tenant-flat-${flat.id}`} className="rounded-[7px] bg-[hsl(var(--primary)/.13)] px-2.5 py-1.5 text-[10px] font-bold text-[hsl(var(--primary-foreground))] transition-colors hover:bg-[hsl(var(--primary)/.24)]">Assign tenant</button> : flat.isExpired ? <button type="button" onClick={onResolve} data-testid={`button-resolve-flat-${flat.id}`} className="rounded-[7px] bg-[hsl(var(--destructive)/.13)] px-2.5 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] transition-colors hover:bg-[hsl(var(--destructive)/.22)]">Resolve</button> : <button type="button" onClick={onPay} data-testid={`button-record-payment-${flat.id}`} className="rounded-[7px] bg-[hsl(var(--primary)/.13)] px-2.5 py-1.5 text-[10px] font-bold text-[hsl(var(--primary-foreground))] transition-colors hover:bg-[hsl(var(--primary)/.24)]">Record payment</button>}{flat.isOccupied && <button type="button" onClick={onVacate} data-testid={`button-vacate-flat-${flat.id}`} title="Vacate unit" className="rounded-md p-1.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"><UserMinus size={14} /></button>}<button type="button" onClick={onEdit} data-testid={`button-edit-flat-${flat.id}`} className="rounded-md p-1.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"><Pencil size={14} /></button><button type="button" onClick={onDelete} data-testid={`button-delete-flat-${flat.id}`} title="Delete unit" className="rounded-md p-1.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--destructive)/.1)] hover:text-[hsl(var(--destructive))]"><Trash2 size={14} /></button></div></td></tr>;
+  const paidThisCycle = flat.dueCycleCount === 0;
+  return <tr data-testid={`row-ledger-${flat.id}`} className="group border-b border-[hsl(var(--border)/.7)] last:border-0 transition-colors hover:bg-[hsl(var(--muted)/.38)]"><td className="max-w-[220px] px-5 py-4"><button type="button" onClick={onSelect} data-testid={`button-open-flat-${flat.id}`} className="flex w-full min-w-0 items-center gap-3 text-left"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] bg-[hsl(var(--sidebar))] text-[11px] font-bold text-[hsl(var(--sidebar-primary))]">{flat.flatNo.slice(-3)}</span><span className="min-w-0"><span className="block truncate text-[12px] font-bold">{flat.tenantName ?? 'Vacant'}</span><span className="mt-0.5 block truncate text-[10px] text-[hsl(var(--muted-foreground))]">{flat.propertyName} · {flat.flatNo}</span></span></button></td><td className="px-3 py-4 mono text-[12px] font-medium">{flat.rent != null ? formatMoney(flat.rent) : '—'}</td><td className="px-3 py-4 mono text-[12px] font-medium">{formatMoney(flat.totalPaid)}</td><td className="px-3 py-4 text-[11px] text-[hsl(var(--muted-foreground))]">{formatDate(flat.lastPaymentDate, true)}</td><td className="px-3 py-4">{!flat.isOccupied ? <span className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px] font-bold text-[hsl(var(--muted-foreground))]"><span className="h-1.5 w-1.5 rounded-full bg-current" />Vacant</span> : flat.isExpired ? <span className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--destructive)/.14)] px-2 py-1 text-[10px] font-bold text-[hsl(var(--destructive))]"><span className="h-1.5 w-1.5 rounded-full bg-current" />Expired</span> : <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-bold ${paidThisCycle ? 'bg-[hsl(var(--primary)/.16)] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--accent)/.16)] text-[hsl(var(--accent-foreground))]'}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{paidThisCycle ? 'Paid' : 'Due'}</span>}{flat.isOccupied && !paidThisCycle && <span className="mt-1 block text-[10px] text-[hsl(var(--muted-foreground))]">{formatDueCyclesLabel(flat.cycles)}</span>}</td><td className="px-5 py-4"><div className="flex justify-end gap-1">{!flat.isOccupied ? <button type="button" onClick={onAssignTenant} data-testid={`button-assign-tenant-flat-${flat.id}`} className="rounded-[7px] bg-[hsl(var(--primary)/.13)] px-2.5 py-1.5 text-[10px] font-bold text-[hsl(var(--primary-foreground))] transition-colors hover:bg-[hsl(var(--primary)/.24)]">Assign tenant</button> : flat.isExpired ? <button type="button" onClick={onResolve} data-testid={`button-resolve-flat-${flat.id}`} className="rounded-[7px] bg-[hsl(var(--destructive)/.13)] px-2.5 py-1.5 text-[10px] font-bold text-[hsl(var(--destructive))] transition-colors hover:bg-[hsl(var(--destructive)/.22)]">Resolve</button> : <button type="button" onClick={onPay} data-testid={`button-record-payment-${flat.id}`} className="rounded-[7px] bg-[hsl(var(--primary)/.13)] px-2.5 py-1.5 text-[10px] font-bold text-[hsl(var(--primary-foreground))] transition-colors hover:bg-[hsl(var(--primary)/.24)]">Record payment</button>}{flat.isOccupied && <button type="button" onClick={onVacate} data-testid={`button-vacate-flat-${flat.id}`} title="Vacate unit" className="rounded-md p-1.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"><UserMinus size={14} /></button>}<button type="button" onClick={onEdit} data-testid={`button-edit-flat-${flat.id}`} className="rounded-md p-1.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"><Pencil size={14} /></button><button type="button" onClick={onDelete} data-testid={`button-delete-flat-${flat.id}`} title="Delete unit" className="rounded-md p-1.5 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--destructive)/.1)] hover:text-[hsl(var(--destructive))]"><Trash2 size={14} /></button></div></td></tr>;
 }
 
 // The table's columns don't fit a phone screen - this is the same row's
 // data as a stacked card instead, used below the md breakpoint.
 function LedgerCard({ flat, onEdit, onDelete, onPay, onSelect, onResolve, onAssignTenant, onVacate }: { flat: Flat; onEdit: () => void; onDelete: () => void; onPay: () => void; onSelect: () => void; onResolve: () => void; onAssignTenant: () => void; onVacate: () => void }) {
-  const paidThisCycle = isPaidForCurrentCycle(flat.moveInDate, flat.lastPaymentDate);
+  const paidThisCycle = flat.dueCycleCount === 0;
   return <div data-testid={`card-ledger-${flat.id}`} className="p-4">
     <button type="button" onClick={onSelect} data-testid={`button-open-flat-${flat.id}`} className="flex w-full items-center gap-3 text-left">
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] bg-[hsl(var(--sidebar))] text-[11px] font-bold text-[hsl(var(--sidebar-primary))]">{flat.flatNo.slice(-3)}</span>
@@ -680,7 +692,10 @@ function LedgerCard({ flat, onEdit, onDelete, onPay, onSelect, onResolve, onAssi
         <span className="block truncate text-[13px] font-bold">{flat.tenantName ?? 'Vacant'}</span>
         <span className="mt-0.5 block truncate text-[11px] text-[hsl(var(--muted-foreground))]">{flat.propertyName} · {flat.flatNo}</span>
       </span>
-      {!flat.isOccupied ? <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px] font-bold text-[hsl(var(--muted-foreground))]"><span className="h-1.5 w-1.5 rounded-full bg-current" />Vacant</span> : flat.isExpired ? <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[hsl(var(--destructive)/.14)] px-2 py-1 text-[10px] font-bold text-[hsl(var(--destructive))]"><span className="h-1.5 w-1.5 rounded-full bg-current" />Expired</span> : <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-bold ${paidThisCycle ? 'bg-[hsl(var(--primary)/.16)] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--accent)/.16)] text-[hsl(var(--accent-foreground))]'}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{paidThisCycle ? 'Paid' : 'Due'}</span>}
+      <span className="flex shrink-0 flex-col items-end gap-1">
+        {!flat.isOccupied ? <span className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--muted))] px-2 py-1 text-[10px] font-bold text-[hsl(var(--muted-foreground))]"><span className="h-1.5 w-1.5 rounded-full bg-current" />Vacant</span> : flat.isExpired ? <span className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--destructive)/.14)] px-2 py-1 text-[10px] font-bold text-[hsl(var(--destructive))]"><span className="h-1.5 w-1.5 rounded-full bg-current" />Expired</span> : <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-bold ${paidThisCycle ? 'bg-[hsl(var(--primary)/.16)] text-[hsl(var(--primary-foreground))]' : 'bg-[hsl(var(--accent)/.16)] text-[hsl(var(--accent-foreground))]'}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{paidThisCycle ? 'Paid' : 'Due'}</span>}
+        {flat.isOccupied && !paidThisCycle && <span className="text-[9px] text-[hsl(var(--muted-foreground))]">{formatDueCyclesLabel(flat.cycles)}</span>}
+      </span>
     </button>
     <div className="mt-3.5 flex items-center gap-4 border-t border-[hsl(var(--border)/.7)] pt-3">
       <div><p className="mono text-[9px] uppercase text-[hsl(var(--muted-foreground))]">Rent</p><p className="mono mt-0.5 text-[12px] font-medium">{flat.rent != null ? formatMoney(flat.rent) : '—'}</p></div>
@@ -696,8 +711,24 @@ function LedgerCard({ flat, onEdit, onDelete, onPay, onSelect, onResolve, onAssi
   </div>;
 }
 
+function CycleListRow({ cycle }: { cycle: FlatCycle }) {
+  const label = cycle.status === 'paid' ? 'Paid' : cycle.status === 'part-paid' ? 'Part-paid' : 'Due';
+  const badgeClass = cycle.status === 'paid' ? 'bg-[hsl(var(--primary)/.16)] text-[hsl(var(--primary-foreground))]' : cycle.status === 'part-paid' ? 'bg-[hsl(var(--accent)/.16)] text-[hsl(var(--accent-foreground))]' : 'bg-[hsl(var(--destructive)/.14)] text-[hsl(var(--destructive))]';
+  return <div data-testid={`cycle-${cycle.cycleMonth.slice(0, 7)}`} className="rounded-[9px] border border-[hsl(var(--border))] px-3.5 py-3">
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[12px] font-bold">{formatCycleMonth(cycle.cycleMonth)}</span>
+      <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-bold ${badgeClass}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{label}</span>
+    </div>
+    <div className="mt-1.5 flex items-center justify-between text-[11px]">
+      <span className="text-[hsl(var(--muted-foreground))]">{cycle.payments.length ? cycle.payments.map((payment) => formatDate(payment.paymentDate)).join(', ') : 'No payment'}</span>
+      <span className="mono font-medium">{cycle.status === 'paid' ? formatMoney(cycle.totalPaid) : `${formatMoney(cycle.totalPaid)} / ${formatMoney(cycle.rentDue)}`}</span>
+    </div>
+    {cycle.status === 'part-paid' && <p className="mt-1 text-[10px] font-semibold text-[hsl(var(--accent-foreground))]">Balance: {formatMoney(cycle.rentDue - cycle.totalPaid)}</p>}
+  </div>;
+}
+
 function FlatDetail({ flat, payments, loading, onClose, onEdit, onRecordPayment, onResolveExpired, onAssignTenant, onVacate, onDeleteUnit }: { flat: Flat; payments: { id: string; paymentDate: string; amount: number }[]; loading: boolean; onClose: () => void; onEdit: () => void; onRecordPayment: () => void; onResolveExpired: () => void; onAssignTenant: () => void; onVacate: () => void; onDeleteUnit: () => void }) {
-  return <div className="fixed inset-0 z-30 flex justify-end bg-[hsl(var(--foreground)/.22)] backdrop-blur-[1px]"><section className="animate-rise-in h-full w-full max-w-[420px] overflow-y-auto border-l border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 shadow-[-20px_0_60px_hsl(var(--foreground)/.12)] sm:p-7"><div className="mb-8 flex items-start justify-between"><div><p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Unit detail</p><h2 className="display mt-1 text-[24px] font-semibold tracking-[-.05em]">{flat.flatNo}</h2></div><button type="button" onClick={onClose} data-testid="button-close-flat-detail" className="rounded-full p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><X size={17} /></button></div>{flat.isExpired && <div data-testid="badge-detail-expired" className="mb-4 flex items-center gap-2 rounded-[9px] bg-[hsl(var(--destructive)/.12)] px-3.5 py-2.5 text-[11px] font-bold text-[hsl(var(--destructive))]"><span className="h-1.5 w-1.5 rounded-full bg-current" />Lease expired {formatDate(flat.tenureEnd, true)}</div>}{flat.isOccupied ? <div className="rounded-[13px] bg-[hsl(var(--sidebar))] p-5 text-[hsl(var(--sidebar-foreground))]"><p className="text-[16px] font-bold">{flat.tenantName}</p><p className="mt-1 text-[11px] text-[hsl(var(--sidebar-foreground)/.58)]">{flat.propertyName} · {flat.workplace || 'Workplace not added'}</p><div className="mt-6 grid grid-cols-2 gap-4"><div><p className="mono text-[9px] uppercase text-[hsl(var(--sidebar-foreground)/.46)]">Monthly rent</p><p className="mt-1 display text-[20px] font-semibold text-[hsl(var(--sidebar-primary))]">{formatMoney(flat.rent ?? undefined)}</p></div><div><p className="mono text-[9px] uppercase text-[hsl(var(--sidebar-foreground)/.46)]">Total paid</p><p className="mt-1 display text-[20px] font-semibold">{formatMoney(flat.totalPaid)}</p></div></div></div> : <div className="rounded-[13px] border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--muted)/.25)] p-5 text-center"><p className="text-[13px] font-bold">Vacant unit</p><p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">{flat.propertyName} · No tenant currently mapped to this unit.</p></div>}<div className="mt-4 flex gap-2">{!flat.isOccupied ? <button type="button" onClick={onAssignTenant} data-testid="button-detail-assign-tenant" className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-[hsl(var(--primary))] py-2.5 text-[11px] font-bold text-[hsl(var(--primary-foreground))]"><UserPlus size={14} />Assign tenant</button> : flat.isExpired ? <button type="button" onClick={onResolveExpired} data-testid="button-detail-resolve" className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-[hsl(var(--destructive))] py-2.5 text-[11px] font-bold text-[hsl(var(--destructive-foreground))]">Resolve lease</button> : <button type="button" onClick={onRecordPayment} data-testid="button-detail-record-payment" className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-[hsl(var(--primary))] py-2.5 text-[11px] font-bold text-[hsl(var(--primary-foreground))]"><Plus size={14} />Record payment</button>}<button type="button" onClick={onEdit} data-testid="button-detail-edit-flat" className="flex items-center justify-center gap-1.5 rounded-[8px] border border-[hsl(var(--border))] px-3 py-2.5 text-[11px] font-bold">{flat.isOccupied ? <><Pencil size={14} />Edit tenant</> : <><Pencil size={14} />Edit unit</>}</button>{flat.isOccupied && <button type="button" onClick={onVacate} data-testid="button-detail-vacate" title="Vacate unit - clears the tenant but keeps the unit" className="flex items-center justify-center gap-1.5 rounded-[8px] border border-[hsl(var(--border))] px-3 py-2.5 text-[11px] font-bold text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--destructive)/.4)] hover:text-[hsl(var(--destructive))]"><UserMinus size={14} />Vacate</button>}</div><button type="button" onClick={onDeleteUnit} data-testid="button-detail-delete-unit" className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-[8px] py-2 text-[11px] font-semibold text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))]"><Trash2 size={13} />Delete unit</button><div className="mt-8"><SectionTitle eyebrow="Payment history" title="Recent payments" />{loading ? <SkeletonRows rows={3} /> : payments.length ? <div className="space-y-2">{payments.map((payment) => <div key={payment.id} data-testid={`payment-${payment.id}`} className="flex items-center justify-between rounded-[9px] border border-[hsl(var(--border))] px-3.5 py-3"><div className="flex items-center gap-2.5"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-[hsl(var(--primary)/.14)] text-[hsl(var(--primary-foreground))]"><CircleDollarSign size={14} /></span><span className="text-[11px] font-semibold">{formatDate(payment.paymentDate, true)}</span></div><span className="mono text-[12px] font-medium">{formatMoney(payment.amount)}</span></div>)}</div> : <EmptyState title="No payments yet" description="Record the first rent payment for this unit." />}</div>{flat.isOccupied && <div className="mt-8 border-t border-[hsl(var(--border))] pt-5"><div className="flex justify-between text-[11px]"><span className="text-[hsl(var(--muted-foreground))]">Move-in date</span><span className="font-semibold">{formatDate(flat.moveInDate, true)}</span></div><div className="mt-3 flex justify-between text-[11px]"><span className="text-[hsl(var(--muted-foreground))]">Tenure ends</span><span className={`font-semibold ${flat.isExpired ? 'text-[hsl(var(--destructive))]' : ''}`}>{formatDate(flat.tenureEnd, true)}</span></div><div className="mt-3 flex justify-between text-[11px]"><span className="text-[hsl(var(--muted-foreground))]">Security deposit</span><span className="mono font-medium">{formatMoney(flat.deposit ?? undefined)}</span></div></div>}</section></div>;
+  return <div className="fixed inset-0 z-30 flex justify-end bg-[hsl(var(--foreground)/.22)] backdrop-blur-[1px]"><section className="animate-rise-in h-full w-full max-w-[420px] overflow-y-auto border-l border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5 shadow-[-20px_0_60px_hsl(var(--foreground)/.12)] sm:p-7"><div className="mb-8 flex items-start justify-between"><div><p className="mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">Unit detail</p><h2 className="display mt-1 text-[24px] font-semibold tracking-[-.05em]">{flat.flatNo}</h2></div><button type="button" onClick={onClose} data-testid="button-close-flat-detail" className="rounded-full p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]"><X size={17} /></button></div>{flat.isExpired && <div data-testid="badge-detail-expired" className="mb-4 flex items-center gap-2 rounded-[9px] bg-[hsl(var(--destructive)/.12)] px-3.5 py-2.5 text-[11px] font-bold text-[hsl(var(--destructive))]"><span className="h-1.5 w-1.5 rounded-full bg-current" />Lease expired {formatDate(flat.tenureEnd, true)}</div>}{flat.isOccupied ? <div className="rounded-[13px] bg-[hsl(var(--sidebar))] p-5 text-[hsl(var(--sidebar-foreground))]"><p className="text-[16px] font-bold">{flat.tenantName}</p><p className="mt-1 text-[11px] text-[hsl(var(--sidebar-foreground)/.58)]">{flat.propertyName} · {flat.workplace || 'Workplace not added'}</p><div className="mt-6 grid grid-cols-2 gap-4"><div><p className="mono text-[9px] uppercase text-[hsl(var(--sidebar-foreground)/.46)]">Monthly rent</p><p className="mt-1 display text-[20px] font-semibold text-[hsl(var(--sidebar-primary))]">{formatMoney(flat.rent ?? undefined)}</p></div><div><p className="mono text-[9px] uppercase text-[hsl(var(--sidebar-foreground)/.46)]">Total paid</p><p className="mt-1 display text-[20px] font-semibold">{formatMoney(flat.totalPaid)}</p></div></div></div> : <div className="rounded-[13px] border border-dashed border-[hsl(var(--border))] bg-[hsl(var(--muted)/.25)] p-5 text-center"><p className="text-[13px] font-bold">Vacant unit</p><p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">{flat.propertyName} · No tenant currently mapped to this unit.</p></div>}<div className="mt-4 flex gap-2">{!flat.isOccupied ? <button type="button" onClick={onAssignTenant} data-testid="button-detail-assign-tenant" className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-[hsl(var(--primary))] py-2.5 text-[11px] font-bold text-[hsl(var(--primary-foreground))]"><UserPlus size={14} />Assign tenant</button> : flat.isExpired ? <button type="button" onClick={onResolveExpired} data-testid="button-detail-resolve" className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-[hsl(var(--destructive))] py-2.5 text-[11px] font-bold text-[hsl(var(--destructive-foreground))]">Resolve lease</button> : <button type="button" onClick={onRecordPayment} data-testid="button-detail-record-payment" className="flex flex-1 items-center justify-center gap-1.5 rounded-[8px] bg-[hsl(var(--primary))] py-2.5 text-[11px] font-bold text-[hsl(var(--primary-foreground))]"><Plus size={14} />Record payment</button>}<button type="button" onClick={onEdit} data-testid="button-detail-edit-flat" className="flex items-center justify-center gap-1.5 rounded-[8px] border border-[hsl(var(--border))] px-3 py-2.5 text-[11px] font-bold">{flat.isOccupied ? <><Pencil size={14} />Edit tenant</> : <><Pencil size={14} />Edit unit</>}</button>{flat.isOccupied && <button type="button" onClick={onVacate} data-testid="button-detail-vacate" title="Vacate unit - clears the tenant but keeps the unit" className="flex items-center justify-center gap-1.5 rounded-[8px] border border-[hsl(var(--border))] px-3 py-2.5 text-[11px] font-bold text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--destructive)/.4)] hover:text-[hsl(var(--destructive))]"><UserMinus size={14} />Vacate</button>}</div><button type="button" onClick={onDeleteUnit} data-testid="button-detail-delete-unit" className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-[8px] py-2 text-[11px] font-semibold text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--destructive))]"><Trash2 size={13} />Delete unit</button>{flat.isOccupied && <div className="mt-8"><SectionTitle eyebrow="Rent cycles" title="Month by month" />{flat.cycles.length ? <div className="space-y-2">{flat.cycles.map((cycle) => <CycleListRow key={cycle.cycleMonth} cycle={cycle} />)}</div> : <EmptyState title="No completed cycles yet" description="The first calendar month of this tenancy hasn't ended yet." />}</div>}<div className="mt-8"><SectionTitle eyebrow="Payment history" title="Recent payments" />{loading ? <SkeletonRows rows={3} /> : payments.length ? <div className="space-y-2">{payments.map((payment) => <div key={payment.id} data-testid={`payment-${payment.id}`} className="flex items-center justify-between rounded-[9px] border border-[hsl(var(--border))] px-3.5 py-3"><div className="flex items-center gap-2.5"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-[hsl(var(--primary)/.14)] text-[hsl(var(--primary-foreground))]"><CircleDollarSign size={14} /></span><span className="text-[11px] font-semibold">{formatDate(payment.paymentDate, true)}</span></div><span className="mono text-[12px] font-medium">{formatMoney(payment.amount)}</span></div>)}</div> : <EmptyState title="No payments yet" description="Record the first rent payment for this unit." />}</div>{flat.isOccupied && <div className="mt-8 border-t border-[hsl(var(--border))] pt-5"><div className="flex justify-between text-[11px]"><span className="text-[hsl(var(--muted-foreground))]">Move-in date</span><span className="font-semibold">{formatDate(flat.moveInDate, true)}</span></div><div className="mt-3 flex justify-between text-[11px]"><span className="text-[hsl(var(--muted-foreground))]">Tenure ends</span><span className={`font-semibold ${flat.isExpired ? 'text-[hsl(var(--destructive))]' : ''}`}>{formatDate(flat.tenureEnd, true)}</span></div><div className="mt-3 flex justify-between text-[11px]"><span className="text-[hsl(var(--muted-foreground))]">Security deposit</span><span className="mono font-medium">{formatMoney(flat.deposit ?? undefined)}</span></div></div>}</section></div>;
 }
 
 type PropertyFormState = { name: string; address: string; unitNumbers: string[] };
@@ -772,8 +803,9 @@ function ExpiredLeaseModal({ flat, form, setForm, onClose, onSubmitRenew, onVaca
   </Modal>;
 }
 
-function PaymentModal({ open, flat, form, setForm, onClose, onSubmit, pending }: { open: boolean; flat: Flat | null; form: { paymentDate: string; amount: string }; setForm: (form: { paymentDate: string; amount: string }) => void; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void; pending: boolean }) {
-  return <Modal open={open} title="Record a payment" description={flat ? `${flat.tenantName} · ${flat.flatNo}` : undefined} onClose={onClose}><form onSubmit={onSubmit} className="space-y-4"><Field label="Amount received"><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[hsl(var(--muted-foreground))]">₹</span><input required min="0" type="number" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} data-testid="input-payment-amount" className={`${inputClass()} pl-8`} /></div></Field><Field label="Payment date"><input required type="date" value={form.paymentDate} onChange={(event) => setForm({ ...form, paymentDate: event.target.value })} data-testid="input-payment-date" className={inputClass()} /></Field><div className="rounded-[9px] bg-[hsl(var(--primary)/.1)] p-3 text-[11px] leading-5 text-[hsl(var(--primary-foreground))]">This payment will be added to the unit's history and reflected in your portfolio totals.</div><div className="flex justify-end gap-2 pt-3"><button type="button" onClick={onClose} data-testid="button-cancel-payment" className="rounded-[8px] px-3.5 py-2.5 text-[12px] font-semibold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]">Cancel</button><button type="submit" disabled={pending} data-testid="button-submit-payment" className="rounded-[8px] bg-[hsl(var(--primary))] px-4 py-2.5 text-[12px] font-bold text-[hsl(var(--primary-foreground))] disabled:opacity-50">{pending ? 'Recording...' : 'Record payment'}</button></div></form></Modal>;
+function PaymentModal({ open, flat, form, setForm, onClose, onSubmit, pending }: { open: boolean; flat: Flat | null; form: { paymentDate: string; amount: string; cycleMonth: string }; setForm: (form: { paymentDate: string; amount: string; cycleMonth: string }) => void; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void; pending: boolean }) {
+  const cycleOptions = generateCycleOptions(flat?.moveInDate);
+  return <Modal open={open} title="Record a payment" description={flat ? `${flat.tenantName} · ${flat.flatNo}` : undefined} onClose={onClose}><form onSubmit={onSubmit} className="space-y-4"><Field label="Amount received"><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[hsl(var(--muted-foreground))]">₹</span><input required min="0" type="number" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} data-testid="input-payment-amount" className={`${inputClass()} pl-8`} /></div></Field><Field label="Payment date"><input required type="date" value={form.paymentDate} onChange={(event) => setForm({ ...form, paymentDate: event.target.value })} data-testid="input-payment-date" className={inputClass()} /></Field><Field label="Rent for" hint="Which month's rent this covers - defaults to the oldest unpaid month"><select required value={form.cycleMonth} onChange={(event) => setForm({ ...form, cycleMonth: event.target.value })} data-testid="select-payment-cycle" className={inputClass()}><option value="">Choose a month</option>{cycleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field><div className="rounded-[9px] bg-[hsl(var(--primary)/.1)] p-3 text-[11px] leading-5 text-[hsl(var(--primary-foreground))]">This payment will be added to the unit's history and reflected in your portfolio totals.</div><div className="flex justify-end gap-2 pt-3"><button type="button" onClick={onClose} data-testid="button-cancel-payment" className="rounded-[8px] px-3.5 py-2.5 text-[12px] font-semibold text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))]">Cancel</button><button type="submit" disabled={pending} data-testid="button-submit-payment" className="rounded-[8px] bg-[hsl(var(--primary))] px-4 py-2.5 text-[12px] font-bold text-[hsl(var(--primary-foreground))] disabled:opacity-50">{pending ? 'Recording...' : 'Record payment'}</button></div></form></Modal>;
 }
 
 function AuthGate() {

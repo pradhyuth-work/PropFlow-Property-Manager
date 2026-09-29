@@ -393,7 +393,7 @@ components:
         address: { type: string, minLength: 1 }
     Flat:
       type: object
-      required: [id, createdAt, propertyId, propertyName, flatNo, tenantName, workplace, govtId, phone, moveInDate, tenureEnd, isExpired, isOccupied, deposit, rent, totalPaid, lastPaymentDate]
+      required: [id, createdAt, propertyId, propertyName, flatNo, tenantName, workplace, govtId, phone, moveInDate, tenureEnd, isExpired, isOccupied, deposit, rent, totalPaid, lastPaymentDate, cycles, oldestDueCycle, dueCycleCount]
       properties:
         id: { type: string }
         createdAt: { type: string, format: date-time }
@@ -412,6 +412,26 @@ components:
         rent: { type: ["number", "null"] }
         totalPaid: { type: number }
         lastPaymentDate: { type: ["string", "null"], format: date }
+        cycles:
+          type: array
+          description: "Every completed calendar-month rent cycle from move-in month through the last month that has fully ended, oldest first. Empty for a vacant unit or a tenant who hasn't completed a first month yet."
+          items: { $ref: "#/components/schemas/FlatCycle" }
+        oldestDueCycle: { type: ["string", "null"], format: date, description: "First day of the oldest cycle that is not fully paid (due or part-paid), or null if every cycle is paid" }
+        dueCycleCount: { type: number, description: "Count of cycles that are due or part-paid" }
+    FlatCycle:
+      type: object
+      required: [cycleMonth, status, rentDue, totalPaid, payments]
+      properties:
+        cycleMonth: { type: string, format: date, description: "First day of the cycle's month" }
+        status: { $ref: "#/components/schemas/CycleStatus" }
+        rentDue: { type: number, description: "The unit's current rent, used as this cycle's expected amount" }
+        totalPaid: { type: number, description: "Sum of payments assigned to this cycle" }
+        payments:
+          type: array
+          items: { $ref: "#/components/schemas/Payment" }
+    CycleStatus:
+      type: string
+      enum: [paid, due, part-paid]
     FlatInput:
       type: object
       required: [propertyId, flatNo]
@@ -447,19 +467,21 @@ components:
         rent: { type: number, minimum: 0 }
     Payment:
       type: object
-      required: [id, createdAt, flatId, paymentDate, amount]
+      required: [id, createdAt, flatId, paymentDate, amount, cycleMonth]
       properties:
         id: { type: string }
         createdAt: { type: string, format: date-time }
         flatId: { type: string }
         paymentDate: { type: string, format: date }
         amount: { type: number, minimum: 0 }
+        cycleMonth: { type: ["string", "null"], format: date, description: "First day of the calendar-month rent cycle this payment covers - not necessarily the month of paymentDate, since rent is paid in arrears" }
     PaymentInput:
       type: object
-      required: [paymentDate, amount]
+      required: [paymentDate, amount, cycleMonth]
       properties:
         paymentDate: { type: string, format: date }
         amount: { type: number, minimum: 0 }
+        cycleMonth: { type: string, format: date, description: "First day of the calendar-month rent cycle this payment covers" }
     DashboardSummary:
       type: object
       required: [expectedMonthlyRevenue, totalCollected, occupiedUnits, totalUnits, propertiesCount, dueForRevision]

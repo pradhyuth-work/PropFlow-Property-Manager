@@ -13,4 +13,9 @@ export interface Payment {
   paymentDate: Date;
   /** @minimum 0 */
   amount: number;
+  /**
+     * First day of the calendar-month rent cycle this payment covers - not necessarily the month of paymentDate, since rent is paid in arrears
+     * @nullable
+     */
+  cycleMonth: Date | null;
 }

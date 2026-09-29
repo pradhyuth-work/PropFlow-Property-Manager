@@ -52,6 +52,13 @@ export const payments = pgTable("payments", {
   flatId: uuid("flat_id").references(() => flats.id).notNull(),
   paymentDate: date("payment_date").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  // Which calendar-month rent cycle this payment covers (always the 1st of
+  // that month) - rent is paid in arrears, and a payment's own date doesn't
+  // reliably say which month it's for (e.g. paid a few days early, or a
+  // couple of months late), so this is set explicitly rather than derived
+  // from paymentDate at read time. Nullable: existing rows predate this
+  // column and get backfilled separately, not defaulted here.
+  cycleMonth: date("cycle_month"),
 });
 
 export const insertOwnerSchema = createInsertSchema(owners);
