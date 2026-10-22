@@ -7,5 +7,11 @@
     "server.mjs": {
       "includeFiles": "artifacts/api-server/dist/public/**"
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/healthz/db",
+      "schedule": "0 9 * * *"
+    }
+  ]
 }

@@ -72,3 +72,11 @@ client-side routing.
   `includeFiles` glob in `vercel.json` together.
 - **`varasidhi-dsr`** is a separate, unrelated Vercel project (different repo/app). Don't confuse
   it with this one.
+
+## Keeping the database from auto-pausing
+
+The root `vercel.json` defines a daily Vercel Cron Job hitting `GET /api/healthz/db`, which runs
+a trivial `SELECT 1` against the database. This app sees real usage only a few times a month, and
+a usage-based free-tier Postgres host (e.g. Supabase) auto-pauses a project after ~7 days with no
+activity — the daily cron keeps that from ever triggering. If this route or cron entry is ever
+removed, the database may get auto-paused between uses.
