@@ -13,7 +13,7 @@ export const owners = pgTable("owners", {
   // impractical over the network.
   failedPinAttempts: integer("failed_pin_attempts").notNull().default(0),
   lockedUntil: timestamp("locked_until", { withTimezone: true }),
-});
+}).enableRLS();
 
 export const properties = pgTable("properties", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -21,7 +21,7 @@ export const properties = pgTable("properties", {
   name: text("name").notNull(),
   address: text("address").notNull(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
-});
+}).enableRLS();
 
 export const flats = pgTable("flats", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -44,7 +44,7 @@ export const flats = pgTable("flats", {
   deposit: numeric("deposit", { precision: 12, scale: 2 }),
   rent: numeric("rent", { precision: 12, scale: 2 }),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
-});
+}).enableRLS();
 
 export const payments = pgTable("payments", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -59,7 +59,7 @@ export const payments = pgTable("payments", {
   // from paymentDate at read time. Nullable: existing rows predate this
   // column and get backfilled separately, not defaulted here.
   cycleMonth: date("cycle_month"),
-});
+}).enableRLS();
 
 export const insertOwnerSchema = createInsertSchema(owners);
 export const insertPropertySchema = createInsertSchema(properties);
