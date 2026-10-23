@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Kanit:ital,wght@1,800;1,900&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @plugin "@tailwindcss/typography";
@@ -28,110 +28,126 @@
   --color-destructive-foreground: hsl(var(--destructive-foreground));
   --font-sans: var(--app-font-sans);
   --font-mono: var(--app-font-mono);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
 }
 
+/* Two-colour "swap" palette. The page is one flat colour (--c-main), the other
+   colour (--c-alt) is the loud accent, and a near-black brown ink does all the
+   outlines, text and hard shadows. Swapping the theme just exchanges the two
+   colours; everything else reads from the semantic tokens below. */
 :root {
-  --background: 228 27% 9%;
-  --foreground: 222 24% 96%;
-  --border: 225 20% 22%;
-  --input: 225 19% 28%;
-  --ring: 239 83% 76%;
-  --card: 226 25% 13%;
-  --card-foreground: 222 24% 96%;
-  --card-border: 225 20% 21%;
-  --popover: 226 25% 14%;
-  --popover-foreground: 222 24% 96%;
-  --primary: 239 83% 76%;
-  --primary-foreground: 229 27% 11%;
-  --secondary: 225 22% 18%;
-  --secondary-foreground: 222 24% 96%;
-  --muted: 225 21% 17%;
-  --muted-foreground: 222 13% 64%;
-  --accent: 38 95% 62%;
-  --accent-foreground: 229 27% 11%;
-  --destructive: 3 75% 63%;
-  --destructive-foreground: 222 24% 96%;
-  --sidebar: 229 31% 7%;
-  --sidebar-foreground: 222 24% 96%;
-  --sidebar-border: 225 20% 17%;
-  --sidebar-primary: 38 95% 62%;
-  --sidebar-primary-foreground: 229 30% 5%;
-  --sidebar-accent: 225 22% 13%;
-  --sidebar-accent-foreground: 222 24% 96%;
-  --chart-1: 239 83% 76%;
-  --chart-2: 38 95% 62%;
-  --chart-3: 188 76% 61%;
-  --chart-4: 328 78% 72%;
-  --chart-5: 155 66% 61%;
-  --app-font-sans: 'DM Sans', sans-serif;
-  --app-font-mono: 'DM Mono', monospace;
-  --radius: 1rem;
-  --primary-border: hsl(239 83% 68%);
-  --secondary-border: hsl(225 19% 30%);
-  --accent-border: hsl(38 95% 52%);
-  --destructive-border: hsl(3 75% 53%);
-  --muted-border: hsl(225 20% 24%);
-  --shadow-sm: 0 12px 30px hsl(229 31% 2% / .2);
-  --shadow-md: 0 24px 60px hsl(229 31% 2% / .38);
+  --ink: 17 38% 10%;
+  --c-main: 188 86% 53%;
+  --c-alt: 16 100% 56%;
+  --c-tint: 188 85% 90%;
+  --c-soft: 188 72% 78%;
+
+  --background: var(--c-main);
+  --foreground: var(--ink);
+  --border: var(--ink);
+  --input: var(--ink);
+  --ring: var(--ink);
+  --card: var(--c-tint);
+  --card-foreground: var(--ink);
+  --card-border: var(--ink);
+  --popover: var(--c-tint);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: var(--c-main);
+  --secondary: var(--c-tint);
+  --secondary-foreground: var(--ink);
+  --muted: var(--c-soft);
+  --muted-foreground: 17 30% 24%;
+  --accent: var(--c-alt);
+  --accent-foreground: var(--ink);
+  --destructive: 355 85% 32%;
+  --destructive-foreground: 0 0% 100%;
+  --sidebar: var(--ink);
+  --sidebar-foreground: var(--c-main);
+  --sidebar-border: 17 22% 24%;
+  --sidebar-primary: var(--c-alt);
+  --sidebar-primary-foreground: var(--ink);
+  --sidebar-accent: 17 30% 17%;
+  --sidebar-accent-foreground: var(--c-main);
+  --chart-1: var(--ink);
+  --chart-2: var(--c-alt);
+  --chart-3: var(--c-main);
+  --chart-4: 17 30% 45%;
+  --chart-5: var(--c-tint);
+  --app-font-sans: 'Barlow', system-ui, sans-serif;
+  --app-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --radius: 0px;
+  --primary-border: hsl(var(--ink));
+  --secondary-border: hsl(var(--ink));
+  --accent-border: hsl(var(--ink));
+  --destructive-border: hsl(var(--ink));
+  --muted-border: hsl(var(--ink));
+  --shadow-sm: 3px 3px 0 hsl(var(--ink));
+  --shadow-md: 6px 6px 0 hsl(var(--ink));
+  color-scheme: light;
 }
 
-.dark {
-  --background: 224 28% 12%;
-  --foreground: 39 31% 92%;
-  --border: 224 20% 27%;
-  --input: 224 20% 30%;
-  --ring: 164 53% 48%;
-  --card: 224 24% 16%;
-  --card-foreground: 39 31% 92%;
-  --card-border: 224 20% 27%;
-  --popover: 224 24% 16%;
-  --popover-foreground: 39 31% 92%;
-  --primary: 164 53% 47%;
-  --primary-foreground: 224 28% 12%;
-  --secondary: 224 22% 22%;
-  --secondary-foreground: 39 31% 92%;
-  --muted: 224 22% 21%;
-  --muted-foreground: 39 15% 66%;
-  --accent: 27 82% 60%;
-  --accent-foreground: 224 28% 12%;
-  --destructive: 2 65% 58%;
-  --destructive-foreground: 39 38% 97%;
-  --sidebar: 224 30% 9%;
-  --sidebar-foreground: 39 31% 92%;
-  --sidebar-border: 224 20% 20%;
-  --sidebar-primary: 42 91% 67%;
-  --sidebar-primary-foreground: 224 30% 5%;
-  --sidebar-accent: 224 22% 16%;
-  --sidebar-accent-foreground: 39 38% 97%;
+:root[data-theme='orange'] {
+  --c-main: 16 100% 56%;
+  --c-alt: 188 86% 53%;
+  --c-tint: 20 100% 91%;
+  --c-soft: 16 100% 78%;
+  --chart-4: 17 38% 30%;
 }
 
 @layer base {
   * { @apply border-border; }
-  body { @apply font-sans antialiased bg-background text-foreground; background-image: radial-gradient(circle at 78% -10%, hsl(var(--primary) / .12), transparent 30rem), radial-gradient(circle at 8% 12%, hsl(var(--accent) / .06), transparent 28rem); }
+  html { background: hsl(var(--background)); }
+  body { @apply font-sans antialiased bg-background text-foreground; transition: background-color .25s ease; }
   button, a, input, select { -webkit-tap-highlight-color: transparent; }
-  button { cursor: pointer; }
+  button { cursor: pointer; font-family: 'Chakra Petch', var(--app-font-sans); text-transform: uppercase; letter-spacing: .06em; }
+  ::selection { background: hsl(var(--ink)); color: hsl(var(--c-main)); }
+  :focus-visible { outline: 3px solid hsl(var(--c-alt)); outline-offset: 2px; }
 }
 
 @keyframes rise-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 @keyframes pulse-dot { 0%, 100% { opacity: .4; transform: scale(.85); } 50% { opacity: 1; transform: scale(1); } }
 .animate-rise-in { animation: rise-in .5s cubic-bezier(.22,1,.36,1) both; }
-.skeleton { background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--card)) 50%, hsl(var(--muted)) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+.skeleton { background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--card)) 50%, hsl(var(--muted)) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border: 2px solid hsl(var(--ink) / .25); }
 .pulse-dot { animation: pulse-dot 2.2s ease-in-out infinite; }
 .mono { font-family: var(--app-font-mono); }
-.display { font-family: 'Bricolage Grotesque', sans-serif; }
-.noise::after { content: ''; position: fixed; inset: 0; pointer-events: none; opacity: .035; z-index: 50; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.45'/%3E%3C/svg%3E"); }
-.workspace-grid { background-image: linear-gradient(hsl(var(--border) / .22) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--border) / .22) 1px, transparent 1px); background-size: 36px 36px; }
-.hairline { border-color: hsl(var(--border) / .72); }
+
+/* Headline face: heavy, slanted, all caps. Unlayered on purpose so it wins over
+   the per-element tracking/weight utilities the markup was originally written with. */
+.display { font-family: 'Kanit', 'Barlow', sans-serif; font-style: italic; font-weight: 800; text-transform: uppercase; letter-spacing: .005em; line-height: 1.04; }
+.label { font-family: 'Chakra Petch', var(--app-font-sans); font-weight: 700; text-transform: uppercase; letter-spacing: .14em; }
+
+/* Poster / panel pieces */
+.glass { background: hsl(var(--card)); border: 2px solid hsl(var(--ink)); box-shadow: var(--shadow-sm); }
+.border { border-width: 2px; }
+.shadow-sm { box-shadow: 2px 2px 0 hsl(var(--ink)); }
+.hairline { border-color: hsl(var(--ink) / .72); }
+.slant-poster { clip-path: polygon(0 3%, 100% 0, 100% 97%, 0 100%); }
+.tilt { transform: rotate(-1.6deg); }
+.halftone { height: 16px; background: radial-gradient(hsl(var(--ink)) 1.6px, transparent 2.1px) 0 0 / 8px 8px; opacity: .55; }
+.ink-panel { background: hsl(var(--ink)); color: hsl(var(--c-main)); border: 2px solid hsl(var(--ink)); }
+.workspace-grid { background-image: radial-gradient(hsl(var(--ink) / .16) 1.2px, transparent 1.7px); background-size: 16px 16px; }
+
+/* Solid ink buttons get the notched top-right / bottom-left corners. Matched on
+   the class so every existing primary button picks it up without markup churn. */
+button[class*='bg-[hsl(var(--primary))]'], .clip-notch { clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px)); }
+button[class*='bg-[hsl(var(--primary))]']:not(:disabled):hover { background: hsl(var(--c-alt)); color: hsl(var(--ink)); }
+
+input, select, textarea { font-family: var(--app-font-sans); }
+input::placeholder { color: hsl(var(--ink) / .5); }
+
 /* Installed as a standalone PWA (viewport-fit=cover), content can draw under
    the notch/home-indicator unless explicitly padded for it. */
 .safe-top { padding-top: env(safe-area-inset-top); }
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 .safe-x { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
-.glass { background: linear-gradient(135deg, hsl(var(--card) / .92), hsl(var(--card) / .72)); box-shadow: inset 0 1px 0 hsl(var(--foreground) / .045), var(--shadow-sm); backdrop-filter: blur(18px); }
-.glow-primary { box-shadow: 0 0 0 1px hsl(var(--primary) / .16), 0 12px 44px hsl(var(--primary) / .12); }
 .text-balance { text-wrap: balance; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise-in, .pulse-dot, .skeleton { animation: none; }
+  body { transition: none; }
+}
