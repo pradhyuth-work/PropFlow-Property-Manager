@@ -122,22 +122,41 @@ const navItems: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
 // The one brand mark for the whole app - sidebar, login/setup screens, the
 // compact mobile header - same image asset everywhere so it reads as a
 // single app identity, matching the favicon and installable PWA icon.
-function Logo({ className = 'h-9 w-9' }: { className?: string }) {
-  return <svg viewBox="0 0 42 40" aria-hidden="true" className={`shrink-0 ${className}`} fill="currentColor"><path d="M13 3h28l-4 9H9zM9 15h28l-4 9H5zM5 27h28l-4 9H1z" /></svg>;
+function Logo({ className = 'h-9 w-9', inverse = false }: { className?: string; inverse?: boolean }) {
+  return <svg viewBox="0 0 64 64" aria-hidden="true" className={`logo shrink-0 ${inverse ? 'logo-inverse' : ''} ${className}`}>
+    <polygon className="logo-badge" points="32,2 62,22 62,62 14,62 2,50 2,22" />
+    <path className="logo-roof" d="M8 25.5 L32 9.5 L56 25.5" fill="none" strokeWidth="3.6" />
+    <rect className="logo-detail" x="11" y="28" width="9" height="9" />
+    <rect className="logo-detail" x="11" y="39" width="9" height="9" />
+    <rect className="logo-detail" x="22" y="39" width="9" height="9" />
+    <rect className="logo-accent" x="22" y="28" width="9" height="9" />
+    <path className="logo-arrow" d="M22 58 L34 48 L40 54 L53 39" fill="none" strokeWidth="4.4" strokeLinejoin="miter" />
+    <polygon className="logo-accent" points="59,32 57.2,42.6 48.7,35" />
+  </svg>;
 }
 
-// Swaps the cyan/orange palette. The choice is kept in localStorage (read back
-// by a tiny script in index.html before first paint, so there is no flash).
+// Cycles the palette: cyan -> orange -> dark neon. The choice is kept in
+// localStorage (read back by a tiny script in index.html before first paint,
+// so there is no flash).
+const THEMES = ['cyan', 'orange', 'neon'] as const;
+type ThemeName = (typeof THEMES)[number];
+const THEME_COLOR: Record<ThemeName, string> = { cyan: '#22d3ee', orange: '#ff5a1f', neon: '#090605' };
+
+function currentTheme(): ThemeName {
+  const value = document.documentElement.dataset.theme;
+  return value === 'orange' || value === 'neon' ? value : 'cyan';
+}
+
 function ThemeSwap({ className = '' }: { className?: string }) {
-  const [theme, setTheme] = useState<'cyan' | 'orange'>(() => (document.documentElement.dataset.theme === 'orange' ? 'orange' : 'cyan'));
+  const [theme, setTheme] = useState<ThemeName>(currentTheme);
+  const next = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
   const swap = () => {
-    const next = theme === 'cyan' ? 'orange' : 'cyan';
     document.documentElement.dataset.theme = next;
     try { localStorage.setItem('propflow-theme', next); } catch { /* storage unavailable: theme just won't persist */ }
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', next === 'orange' ? '#ff5a1f' : '#22d3ee');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLOR[next]);
     setTheme(next);
   };
-  return <button type="button" onClick={swap} data-testid="button-swap-theme" aria-label={`Switch to the ${theme === 'cyan' ? 'orange' : 'cyan'} theme`} title="Swap colors" className={`flex h-9 w-9 shrink-0 items-center justify-center border-2 border-[hsl(var(--foreground))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--accent))] ${className}`}><ArrowLeftRight size={16} /></button>;
+  return <button type="button" onClick={swap} data-testid="button-swap-theme" aria-label={`Switch to the ${next} theme`} title="Swap theme" className={`flex h-9 w-9 shrink-0 items-center justify-center border-2 border-[hsl(var(--line))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--ink))] ${className}`}><ArrowLeftRight size={16} /></button>;
 }
 
 function AppShell({ owner }: { owner: Owner }) {
@@ -451,14 +470,14 @@ function AppShell({ owner }: { owner: Owner }) {
 
   return (
     <div className="flex min-h-[100dvh] bg-[hsl(var(--background))]">
-      <aside className="safe-top safe-x hidden w-[270px] shrink-0 flex-col border-r-2 border-[hsl(var(--foreground))] bg-[hsl(var(--sidebar))] px-5 py-6 md:flex">
+      <aside className="safe-top safe-x hidden w-[270px] shrink-0 flex-col border-r-2 border-[hsl(var(--line))] bg-[hsl(var(--sidebar))] px-5 py-6 md:flex">
         <div className="flex items-center gap-3 px-3">
-          <Logo className="h-9 w-9 text-[hsl(var(--sidebar-primary))]" />
+          <Logo inverse className="h-9 w-9" />
           <div><p className="display text-[20px] text-[hsl(var(--sidebar-foreground))]">RentGrid</p><p className="mono text-[9px] uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.5)]">rent & asset control</p></div>
         </div>
         <div className="mt-12 px-3"><p className="mono mb-3 text-[9px] uppercase tracking-[.18em] text-[hsl(var(--sidebar-foreground)/.42)]">Workspace</p>
           <nav className="space-y-1">
-            {navItems.map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => { setView(id); navigate('/'); }} data-testid={`button-nav-${id}`} className={`group flex w-full items-center gap-3 rounded-none px-3 py-2.5 text-left text-[13px] font-semibold transition-colors ${view === id ? 'bg-[hsl(var(--sidebar-primary))] text-[hsl(var(--sidebar-primary-foreground))]' : 'text-[hsl(var(--sidebar-foreground)/.75)] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))]'}`}><Icon size={17} /><span>{label}</span>{id === 'ledger' && summary?.dueForRevision ? <span className="mono ml-auto border-2 border-[hsl(var(--foreground))] bg-[hsl(var(--accent))] px-1.5 py-0.5 text-[9px] font-bold text-[hsl(var(--accent-foreground))]">{summary.dueForRevision}</span> : null}</button>)}
+            {navItems.map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => { setView(id); navigate('/'); }} data-testid={`button-nav-${id}`} className={`group flex w-full items-center gap-3 rounded-none px-3 py-2.5 text-left text-[13px] font-semibold transition-colors ${view === id ? 'bg-[hsl(var(--sidebar-primary))] text-[hsl(var(--sidebar-primary-foreground))]' : 'text-[hsl(var(--sidebar-foreground)/.75)] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))]'}`}><Icon size={17} /><span>{label}</span>{id === 'ledger' && summary?.dueForRevision ? <span className="mono ml-auto border-2 border-[hsl(var(--line))] bg-[hsl(var(--accent))] px-1.5 py-0.5 text-[9px] font-bold text-[hsl(var(--accent-foreground))]">{summary.dueForRevision}</span> : null}</button>)}
           </nav>
         </div>
         <div className="relative mt-auto px-1">
@@ -467,14 +486,14 @@ function AppShell({ owner }: { owner: Owner }) {
         </div>
       </aside>
       <main className="min-w-0 flex-1">
-        <header className="safe-top safe-x sticky top-0 z-10 border-b-2 border-[hsl(var(--foreground))] bg-[hsl(var(--background))]">
+        <header className="safe-top safe-x sticky top-0 z-10 border-b-2 border-[hsl(var(--line))] bg-[hsl(var(--background))]">
           <div className="flex min-h-[70px] items-center justify-between gap-3 px-5 py-3 sm:px-8">
             <div className="flex min-w-0 items-center gap-3">
               <button type="button" onClick={() => setMobileNav((open) => !open)} data-testid="button-open-navigation" aria-label="Toggle navigation" className="rounded-none p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] md:hidden"><Menu size={19} /></button>
               <div className="flex items-center gap-2.5 md:hidden"><Logo className="h-8 w-8" /><p className="display text-[17px] text-[hsl(var(--foreground))]">RentGrid</p></div>
               <div className="hidden min-w-0 md:block"><p className="mono truncate text-[10px] uppercase tracking-[.18em] text-[hsl(var(--muted-foreground))]">{activePropertyId ? 'Property detail' : todayLabel}</p><h1 className="display mt-0.5 truncate text-[22px]">{activePropertyId ? (activeProperty?.name ?? 'Property') : view === 'overview' ? `${greeting}, ${firstName}` : 'Rent ledger'}</h1></div>
             </div>
-            <div className="flex shrink-0 items-center gap-3"><ThemeSwap /><div className="hidden items-center gap-2 border-2 border-[hsl(var(--foreground))] bg-[hsl(var(--card))] px-3 py-1.5 lg:flex"><span className={`h-1.5 w-1.5 rounded-none ${health.isError ? 'bg-[hsl(var(--destructive))]' : 'bg-[hsl(var(--accent))] ring-2 ring-[hsl(var(--foreground))]'}`} /><span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{health.isError ? 'offline' : 'live sync'}</span></div><button type="button" onClick={() => openCreateProperty()} data-testid="button-header-add-property" className="hidden items-center gap-2 rounded-none bg-[hsl(var(--primary))] px-3 py-2 text-[12px] font-bold text-[hsl(var(--primary-foreground))] shadow-sm transition-transform hover:-translate-y-0.5 sm:flex"><Plus size={15} />Add property</button><div className="relative"><button type="button" onClick={() => setHeaderMenuOpen((open) => !open)} data-testid="button-header-account-menu" className="flex h-8 w-8 items-center justify-center rounded-none border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[11px] font-bold text-[hsl(var(--foreground))] transition-colors hover:border-[hsl(var(--primary))]">{ownerInitials}</button><AccountMenu open={headerMenuOpen} onClose={() => setHeaderMenuOpen(false)} onOpenProfile={() => setProfileModal(true)} onLogout={doLogout} anchor="top-right" /></div></div>
+            <div className="flex shrink-0 items-center gap-3"><ThemeSwap /><div className="hidden items-center gap-2 border-2 border-[hsl(var(--line))] bg-[hsl(var(--card))] px-3 py-1.5 lg:flex"><span className={`h-1.5 w-1.5 rounded-none ${health.isError ? 'bg-[hsl(var(--destructive))]' : 'bg-[hsl(var(--accent))] ring-2 ring-[hsl(var(--line))]'}`} /><span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{health.isError ? 'offline' : 'live sync'}</span></div><button type="button" onClick={() => openCreateProperty()} data-testid="button-header-add-property" className="hidden items-center gap-2 rounded-none bg-[hsl(var(--primary))] px-3 py-2 text-[12px] font-bold text-[hsl(var(--primary-foreground))] shadow-sm transition-transform hover:-translate-y-0.5 sm:flex"><Plus size={15} />Add property</button><div className="relative"><button type="button" onClick={() => setHeaderMenuOpen((open) => !open)} data-testid="button-header-account-menu" className="flex h-8 w-8 items-center justify-center rounded-none border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[11px] font-bold text-[hsl(var(--foreground))] transition-colors hover:border-[hsl(var(--primary))]">{ownerInitials}</button><AccountMenu open={headerMenuOpen} onClose={() => setHeaderMenuOpen(false)} onOpenProfile={() => setProfileModal(true)} onLogout={doLogout} anchor="top-right" /></div></div>
           </div>
           {mobileNav && <div className="animate-rise-in border-t border-[hsl(var(--border))] px-5 py-3 sm:px-8 md:hidden">
             <nav className="grid grid-cols-2 gap-2">
@@ -485,7 +504,7 @@ function AppShell({ owner }: { owner: Owner }) {
           </div>}
         </header>
         <div className="workspace-grid safe-bottom safe-x mx-auto min-h-[calc(100dvh-70px)] max-w-[1600px] px-5 py-8 sm:px-8 lg:px-12">
-          {notice && <div data-testid="status-notice" className={`animate-rise-in mb-5 flex items-center gap-2 rounded-none border px-3.5 py-2.5 text-[12px] font-semibold ${notice.tone === 'success' ? 'border-[hsl(var(--foreground))] bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] shadow-[var(--shadow-sm)]' : 'border-[hsl(var(--destructive))] bg-[hsl(var(--card))] text-[hsl(var(--destructive))] shadow-[var(--shadow-sm)]'}`}><span className={`flex h-5 w-5 items-center justify-center rounded-none ${notice.tone === 'success' ? 'bg-[hsl(var(--foreground))] text-[hsl(var(--background))]' : 'bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]'}`}>{notice.tone === 'success' ? <Check size={13} /> : <X size={13} />}</span>{notice.text}<button type="button" data-testid="button-dismiss-notice" onClick={() => setNotice(null)} className="ml-auto opacity-60 hover:opacity-100"><X size={14} /></button></div>}
+          {notice && <div data-testid="status-notice" className={`animate-rise-in mb-5 flex items-center gap-2 rounded-none border px-3.5 py-2.5 text-[12px] font-semibold ${notice.tone === 'success' ? 'border-[hsl(var(--line))] bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] shadow-[var(--shadow-sm)]' : 'border-[hsl(var(--destructive))] bg-[hsl(var(--card))] text-[hsl(var(--destructive))] shadow-[var(--shadow-sm)]'}`}><span className={`flex h-5 w-5 items-center justify-center rounded-none ${notice.tone === 'success' ? 'bg-[hsl(var(--foreground))] text-[hsl(var(--background))]' : 'bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]'}`}>{notice.tone === 'success' ? <Check size={13} /> : <X size={13} />}</span>{notice.text}<button type="button" data-testid="button-dismiss-notice" onClick={() => setNotice(null)} className="ml-auto opacity-60 hover:opacity-100"><X size={14} /></button></div>}
           {isAnyError ? <ErrorState onRetry={retryQueries} /> : isInitialLoading ? <WorkspaceSkeleton /> : activePropertyId ? <PropertyDetail property={activeProperty} flats={activePropertyFlats} onBack={() => navigate('/')} onEditProperty={() => activeProperty && openEditProperty(activeProperty)} onAddFlat={() => openCreateFlat(activePropertyId)} onAssignTenant={() => openAssignTenant(activePropertyId)} onSelectFlat={setSelectedFlat} onRecordPayment={openPayment} /> : view === 'overview' ? <Overview properties={properties} flats={flats} summary={summary} activities={activities} onAddProperty={openCreateProperty} onEditProperty={openEditProperty} onDeleteProperty={removeProperty} onAddFlat={openCreateFlat} onAssignTenant={openAssignTenant} onSelectFlat={setSelectedFlat} onOpenProperty={(propertyId) => navigate(`/properties/${propertyId}`)} onGoToLedger={() => setView('ledger')} /> : <Ledger flats={filteredFlats} allFlats={flats} properties={properties} search={ledgerSearch} onSearch={setLedgerSearch} propertyFilter={propertyFilter} onPropertyFilter={setPropertyFilter} onAddFlat={openCreateFlat} onEditFlat={openEditFlatOrTenant} onDeleteFlat={removeFlat} onRecordPayment={openPayment} onSelectFlat={setSelectedFlat} onResolveExpired={openResolveExpired} onAssignTenant={() => openAssignTenant()} onVacate={vacateFlatAction} />}
         </div>
       </main>
@@ -580,19 +599,20 @@ function WorkspaceSkeleton() {
 }
 
 function Metric({ label, value, detail, icon: Icon, accent, trend }: { label: string; value: string; detail: string; icon: typeof WalletCards; accent: string; trend?: 'up' | 'down' }) {
-  return <Surface className="group relative overflow-hidden p-5 transition-all duration-300 hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]"><div className={`absolute right-0 top-0 h-2.5 w-20 border-b-2 border-l-2 border-[hsl(var(--foreground))] ${accent}`} /><div className="relative mb-7 flex items-center justify-between"><span className="mono text-[9px] font-medium uppercase tracking-[.15em] text-[hsl(var(--muted-foreground))]">{label}</span><span className="flex h-8 w-8 items-center justify-center rounded-none border border-[hsl(var(--border))] bg-[hsl(var(--background)/.36)]"><Icon size={15} className="text-[hsl(var(--muted-foreground))]" /></span></div><p data-testid={`text-metric-${label.toLowerCase().replaceAll(' ', '-')}`} className="relative display text-[32px]">{value}</p><div className="relative mt-3 flex items-center gap-1.5 text-[11px] text-[hsl(var(--muted-foreground))]">{trend && <span className={trend === 'up' ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--accent))]'}>{trend === 'up' ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}</span>}{detail}</div></Surface>;
+  return <Surface className="group relative overflow-hidden p-5 transition-all duration-300 hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]"><div className={`absolute right-0 top-0 h-2.5 w-20 border-b-2 border-l-2 border-[hsl(var(--line))] ${accent}`} /><div className="relative mb-7 flex items-center justify-between"><span className="mono text-[9px] font-medium uppercase tracking-[.15em] text-[hsl(var(--muted-foreground))]">{label}</span><span className="flex h-8 w-8 items-center justify-center rounded-none border border-[hsl(var(--border))] bg-[hsl(var(--background)/.36)]"><Icon size={15} className="text-[hsl(var(--muted-foreground))]" /></span></div><p data-testid={`text-metric-${label.toLowerCase().replaceAll(' ', '-')}`} className="relative display text-[32px]">{value}</p><div className="relative mt-3 flex items-center gap-1.5 text-[11px] text-[hsl(var(--muted-foreground))]">{trend && <span className={trend === 'up' ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--accent))]'}>{trend === 'up' ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}</span>}{detail}</div></Surface>;
 }
 
 function Overview({ properties, flats, summary, activities, onAddProperty, onEditProperty, onDeleteProperty, onAddFlat, onAssignTenant, onSelectFlat, onOpenProperty, onGoToLedger }: { properties: Property[]; flats: Flat[]; summary?: { expectedMonthlyRevenue: number; totalCollected: number; occupiedUnits: number; totalUnits: number; propertiesCount: number; dueForRevision: number }; activities: { id: string; type: string; title: string; description: string; createdAt: string }[]; onAddProperty: () => void; onEditProperty: (property: Property) => void; onDeleteProperty: (property: Property) => void; onAddFlat: (propertyId?: string) => void; onAssignTenant: (propertyId?: string) => void; onSelectFlat: (flat: Flat) => void; onOpenProperty: (propertyId: string) => void; onGoToLedger: () => void }) {
   const occupancy = summary && summary.totalUnits ? Math.round((summary.occupiedUnits / summary.totalUnits) * 100) : 0;
   const monthYearLabel = `${new Date().toLocaleDateString('en-US', { month: 'short' }).toUpperCase()} / ${new Date().getFullYear()}`;
   return <div className="animate-rise-in space-y-8">
-    <section className="slant-poster relative bg-[hsl(var(--accent))] text-[hsl(var(--foreground))]">
+    <div className="poster-wrap">
+    <section className="slant-poster relative bg-[hsl(var(--accent))] text-[hsl(var(--ink))]">
       <div className="relative flex flex-col justify-between gap-8 px-5 py-12 sm:px-10 lg:flex-row lg:items-end">
         <div className="max-w-[680px]">
-          <div className="mb-5 flex items-center gap-2"><span className="pulse-dot h-2.5 w-2.5 bg-[hsl(var(--foreground))]" /><span className="label text-[10px]">Live portfolio control center</span></div>
+          <div className="mb-5 flex items-center gap-2"><span className="pulse-dot h-2.5 w-2.5 bg-[hsl(var(--ink))]" /><span className="label text-[10px]">Live portfolio control center</span></div>
           <h2 className="display text-balance text-[34px] leading-[.95] sm:text-[68px]">Stay ahead of<br />every lease.</h2>
-          <div className="tilt mt-7 max-w-[430px] border-2 border-[hsl(var(--foreground))] bg-[hsl(var(--background))] p-3.5"><p className="display text-[13px]">Portfolio.toml</p><p className="mt-1 text-[14px] leading-5">One clear view of the places, people, and payments that keep your portfolio moving.</p></div>
+          <div className="tilt mt-7 max-w-[430px] border-2 border-[hsl(var(--ink))] bg-[hsl(var(--c-main))] p-3.5"><p className="display text-[13px]">Portfolio.toml</p><p className="mt-1 text-[14px] leading-5">One clear view of the places, people, and payments that keep your portfolio moving.</p></div>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:min-w-[360px]">
           <div className="ink-panel p-3.5"><p className="label text-[9px] opacity-80">Properties</p><p className="mt-2 display text-[28px]">{summary?.propertiesCount ?? 0}</p></div>
@@ -601,6 +621,7 @@ function Overview({ properties, flats, summary, activities, onAddProperty, onEdi
         </div>
       </div>
     </section>
+    </div>
     <div className="halftone -mt-6" aria-hidden="true" />
     <section><div className="mb-4 flex items-end justify-between"><div><p className="mono mb-1 text-[10px] uppercase tracking-[.18em] text-[hsl(var(--muted-foreground))]">Portfolio pulse</p><h2 className="display text-[21px] font-semibold tracking-[-.045em]">Your numbers, at a glance.</h2></div><p className="hidden text-right text-[12px] text-[hsl(var(--muted-foreground))] sm:block">Updated moments ago<br /><span className="mono text-[10px]">{monthYearLabel}</span></p></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Expected this month" value={formatMoney(summary?.expectedMonthlyRevenue)} detail="across active leases" icon={WalletCards} accent="bg-[hsl(var(--primary))]" trend="up" /><Metric label="Collected this month" value={formatMoney(summary?.totalCollected)} detail={`${summary?.expectedMonthlyRevenue ? Math.round((summary.totalCollected / summary.expectedMonthlyRevenue) * 100) : 0}% of expected`} icon={CircleDollarSign} accent="bg-[hsl(var(--accent))]" trend="up" /><Metric label="Occupied units" value={`${summary?.occupiedUnits ?? 0} / ${summary?.totalUnits ?? 0}`} detail={`${occupancy}% portfolio occupancy`} icon={Home} accent="bg-[hsl(var(--chart-3))]" /><Metric label="Needs attention" value={String(summary?.dueForRevision ?? 0).padStart(2, '0')} detail="leases due for revision" icon={ClipboardList} accent="bg-[hsl(var(--chart-4))]" trend={summary?.dueForRevision ? 'down' : undefined} /></div></section>
     <section className="grid gap-5 lg:grid-cols-[1.25fr_.75fr]">
@@ -612,7 +633,7 @@ function Overview({ properties, flats, summary, activities, onAddProperty, onEdi
 }
 
 function ActivityPanel({ activities }: { activities: { id: string; type: string; title: string; description: string; createdAt: string }[] }) {
-  return <Surface className="p-5 sm:p-6"><SectionTitle eyebrow="Signal / 03" title="Recent activity" aside={<Activity size={18} className="text-[hsl(var(--accent))]" />} />{activities.length ? <div className="space-y-0.5">{activities.slice(0, 5).map((item) => <div key={item.id} data-testid={`activity-${item.id}`} className="flex gap-3 border-b border-[hsl(var(--border)/.7)] py-3 last:border-0"><div className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-none ${item.type === 'payment' ? 'bg-[hsl(var(--foreground))] text-[hsl(var(--background))]' : item.type === 'tenant' ? 'border-2 border-[hsl(var(--foreground))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))]' : 'bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]'}`}><span className="h-1.5 w-1.5 rounded-none bg-current" /></div><div className="min-w-0 flex-1"><p className="truncate text-[12px] font-bold">{item.title}</p><p className="truncate text-[11px] text-[hsl(var(--muted-foreground))]">{item.description}</p></div><span className="mono shrink-0 pt-0.5 text-[9px] text-[hsl(var(--muted-foreground))]">{formatDate(item.createdAt)}</span></div>)}</div> : <EmptyState title="A quiet start" description="Property and payment events will show up here." />}</Surface>;
+  return <Surface className="p-5 sm:p-6"><SectionTitle eyebrow="Signal / 03" title="Recent activity" aside={<Activity size={18} className="text-[hsl(var(--accent))]" />} />{activities.length ? <div className="space-y-0.5">{activities.slice(0, 5).map((item) => <div key={item.id} data-testid={`activity-${item.id}`} className="flex gap-3 border-b border-[hsl(var(--border)/.7)] py-3 last:border-0"><div className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-none ${item.type === 'payment' ? 'bg-[hsl(var(--foreground))] text-[hsl(var(--background))]' : item.type === 'tenant' ? 'border-2 border-[hsl(var(--line))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))]' : 'bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]'}`}><span className="h-1.5 w-1.5 rounded-none bg-current" /></div><div className="min-w-0 flex-1"><p className="truncate text-[12px] font-bold">{item.title}</p><p className="truncate text-[11px] text-[hsl(var(--muted-foreground))]">{item.description}</p></div><span className="mono shrink-0 pt-0.5 text-[9px] text-[hsl(var(--muted-foreground))]">{formatDate(item.createdAt)}</span></div>)}</div> : <EmptyState title="A quiet start" description="Property and payment events will show up here." />}</Surface>;
 }
 
 function PropertyCard({ property, flats, onEdit, onDelete, onAddFlat, onAssignTenant, onSelectFlat, onOpenDetail }: { property: Property; flats: Flat[]; onEdit: () => void; onDelete: () => void; onAddFlat: () => void; onAssignTenant: () => void; onSelectFlat: (flat: Flat) => void; onOpenDetail: () => void }) {

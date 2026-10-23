@@ -27,7 +27,7 @@ export function Modal({ open, title, description, onClose, children }: { open: b
             <h2 className="display text-[26px]">{title}</h2>
             {description && <p className="mt-1 text-[13px] text-[hsl(var(--muted-foreground))]">{description}</p>}
           </div>
-          <button type="button" onClick={onClose} data-testid="button-close-modal" className="border-2 border-[hsl(var(--foreground))] p-1.5 text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--accent))]" aria-label="Close dialog"><X size={17} /></button>
+          <button type="button" onClick={onClose} data-testid="button-close-modal" className="border-2 border-[hsl(var(--line))] p-1.5 text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--ink))]" aria-label="Close dialog"><X size={17} /></button>
         </div>
         {children}
       </div>
@@ -41,8 +41,8 @@ export function SkeletonRows({ rows = 4 }: { rows?: number }) {
 
 export function EmptyState({ title, description, action }: { title: string; description: string; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center border-2 border-dashed border-[hsl(var(--foreground))] bg-[hsl(var(--card)/.55)] px-6 py-14 text-center">
-      <div className="mb-5 flex h-12 w-12 items-center justify-center border-2 border-[hsl(var(--foreground))] bg-[hsl(var(--accent))] text-[hsl(var(--foreground))] shadow-[3px_3px_0_hsl(var(--foreground))]"><Dot size={28} strokeWidth={3} /></div>
+    <div className="flex flex-col items-center justify-center border-2 border-dashed border-[hsl(var(--line))] bg-[hsl(var(--card)/.55)] px-6 py-14 text-center">
+      <div className="mb-5 flex h-12 w-12 items-center justify-center border-2 border-[hsl(var(--line))] bg-[hsl(var(--accent))] text-[hsl(var(--ink))] shadow-[3px_3px_0_hsl(var(--line))]"><Dot size={28} strokeWidth={3} /></div>
       <h3 className="display text-[18px]">{title}</h3>
       <p className="mt-1 max-w-[300px] text-[13px] leading-5 text-[hsl(var(--muted-foreground))]">{description}</p>
       {action && <div className="mt-5">{action}</div>}
