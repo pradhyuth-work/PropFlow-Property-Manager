@@ -1,6 +1,6 @@
 import { type FormEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
-import { Activity, ArrowDownRight, ArrowLeft, ArrowLeftRight, ArrowUpRight, Building2, CalendarRange, Check, ChevronRight, CircleDollarSign, ClipboardList, Home, LayoutDashboard, LogOut, Menu, MoreHorizontal, Pencil, Plus, ReceiptIndianRupee, Search, Sparkles, Trash2, UserCog, UserMinus, UserPlus, WalletCards, X } from 'lucide-react';
+import { Activity, ArrowDownRight, ArrowLeft, ArrowUpRight, Building2, CalendarRange, Check, ChevronRight, CircleDollarSign, ClipboardList, Home, LayoutDashboard, LogOut, Menu, MoreHorizontal, Pencil, Plus, ReceiptIndianRupee, Search, Sparkles, Trash2, UserCog, UserMinus, UserPlus, WalletCards, X } from 'lucide-react';
 import type { DateRange } from 'react-day-picker';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { EmptyState, Field, formatCycleMonth, formatDate, formatMoney, Modal, SectionTitle, SkeletonRows, Surface, inputClass } from '@/components/propflow-ui';
@@ -122,8 +122,8 @@ const navItems: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
 // The one brand mark for the whole app - sidebar, login/setup screens, the
 // compact mobile header - same image asset everywhere so it reads as a
 // single app identity, matching the favicon and installable PWA icon.
-function Logo({ className = 'h-9 w-9', inverse = false }: { className?: string; inverse?: boolean }) {
-  return <svg viewBox="0 0 64 64" aria-hidden="true" className={`logo shrink-0 ${inverse ? 'logo-inverse' : ''} ${className}`}>
+function Logo({ className = 'h-9 w-9' }: { className?: string }) {
+  return <svg viewBox="0 0 64 64" aria-hidden="true" className={`logo shrink-0 ${className}`}>
     <polygon className="logo-badge" points="32,2 62,22 62,62 14,62 2,50 2,22" />
     <path className="logo-roof" d="M8 25.5 L32 9.5 L56 25.5" fill="none" strokeWidth="3.6" />
     <rect className="logo-detail" x="11" y="28" width="9" height="9" />
@@ -135,29 +135,6 @@ function Logo({ className = 'h-9 w-9', inverse = false }: { className?: string; 
   </svg>;
 }
 
-// Cycles the palette: cyan -> orange -> dark neon. The choice is kept in
-// localStorage (read back by a tiny script in index.html before first paint,
-// so there is no flash).
-const THEMES = ['cyan', 'orange', 'neon'] as const;
-type ThemeName = (typeof THEMES)[number];
-const THEME_COLOR: Record<ThemeName, string> = { cyan: '#22d3ee', orange: '#ff5a1f', neon: '#090605' };
-
-function currentTheme(): ThemeName {
-  const value = document.documentElement.dataset.theme;
-  return value === 'orange' || value === 'neon' ? value : 'cyan';
-}
-
-function ThemeSwap({ className = '' }: { className?: string }) {
-  const [theme, setTheme] = useState<ThemeName>(currentTheme);
-  const next = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
-  const swap = () => {
-    document.documentElement.dataset.theme = next;
-    try { localStorage.setItem('propflow-theme', next); } catch { /* storage unavailable: theme just won't persist */ }
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLOR[next]);
-    setTheme(next);
-  };
-  return <button type="button" onClick={swap} data-testid="button-swap-theme" aria-label={`Switch to the ${next} theme`} title="Swap theme" className={`flex h-9 w-9 shrink-0 items-center justify-center border-2 border-[hsl(var(--line))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--accent))] hover:text-[hsl(var(--ink))] ${className}`}><ArrowLeftRight size={16} /></button>;
-}
 
 function AppShell({ owner }: { owner: Owner }) {
   const [view, setView] = useState<View>('overview');
@@ -472,7 +449,7 @@ function AppShell({ owner }: { owner: Owner }) {
     <div className="flex min-h-[100dvh] bg-[hsl(var(--background))]">
       <aside className="safe-top safe-x hidden w-[270px] shrink-0 flex-col border-r-2 border-[hsl(var(--line))] bg-[hsl(var(--sidebar))] px-5 py-6 md:flex">
         <div className="flex items-center gap-3 px-3">
-          <Logo inverse className="h-9 w-9" />
+          <Logo className="h-9 w-9" />
           <div><p className="display text-[20px] text-[hsl(var(--sidebar-foreground))]">RentGrid</p><p className="mono text-[9px] uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.5)]">rent & asset control</p></div>
         </div>
         <div className="mt-12 px-3"><p className="mono mb-3 text-[9px] uppercase tracking-[.18em] text-[hsl(var(--sidebar-foreground)/.42)]">Workspace</p>
@@ -493,7 +470,7 @@ function AppShell({ owner }: { owner: Owner }) {
               <div className="flex items-center gap-2.5 md:hidden"><Logo className="h-8 w-8" /><p className="display text-[17px] text-[hsl(var(--foreground))]">RentGrid</p></div>
               <div className="hidden min-w-0 md:block"><p className="mono truncate text-[10px] uppercase tracking-[.18em] text-[hsl(var(--muted-foreground))]">{activePropertyId ? 'Property detail' : todayLabel}</p><h1 className="display mt-0.5 truncate text-[22px]">{activePropertyId ? (activeProperty?.name ?? 'Property') : view === 'overview' ? `${greeting}, ${firstName}` : 'Rent ledger'}</h1></div>
             </div>
-            <div className="flex shrink-0 items-center gap-3"><ThemeSwap /><div className="hidden items-center gap-2 border-2 border-[hsl(var(--line))] bg-[hsl(var(--card))] px-3 py-1.5 lg:flex"><span className={`h-1.5 w-1.5 rounded-none ${health.isError ? 'bg-[hsl(var(--destructive))]' : 'bg-[hsl(var(--accent))] ring-2 ring-[hsl(var(--line))]'}`} /><span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{health.isError ? 'offline' : 'live sync'}</span></div><button type="button" onClick={() => openCreateProperty()} data-testid="button-header-add-property" className="hidden items-center gap-2 rounded-none bg-[hsl(var(--primary))] px-3 py-2 text-[12px] font-bold text-[hsl(var(--primary-foreground))] shadow-sm transition-transform hover:-translate-y-0.5 sm:flex"><Plus size={15} />Add property</button><div className="relative"><button type="button" onClick={() => setHeaderMenuOpen((open) => !open)} data-testid="button-header-account-menu" className="flex h-8 w-8 items-center justify-center rounded-none border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[11px] font-bold text-[hsl(var(--foreground))] transition-colors hover:border-[hsl(var(--primary))]">{ownerInitials}</button><AccountMenu open={headerMenuOpen} onClose={() => setHeaderMenuOpen(false)} onOpenProfile={() => setProfileModal(true)} onLogout={doLogout} anchor="top-right" /></div></div>
+            <div className="flex shrink-0 items-center gap-3"><div className="hidden items-center gap-2 border-2 border-[hsl(var(--line))] bg-[hsl(var(--card))] px-3 py-1.5 lg:flex"><span className={`h-1.5 w-1.5 rounded-none ${health.isError ? 'bg-[hsl(var(--destructive))]' : 'bg-[hsl(var(--accent))] ring-2 ring-[hsl(var(--line))]'}`} /><span className="mono text-[10px] text-[hsl(var(--muted-foreground))]">{health.isError ? 'offline' : 'live sync'}</span></div><button type="button" onClick={() => openCreateProperty()} data-testid="button-header-add-property" className="hidden items-center gap-2 rounded-none bg-[hsl(var(--primary))] px-3 py-2 text-[12px] font-bold text-[hsl(var(--primary-foreground))] shadow-sm transition-transform hover:-translate-y-0.5 sm:flex"><Plus size={15} />Add property</button><div className="relative"><button type="button" onClick={() => setHeaderMenuOpen((open) => !open)} data-testid="button-header-account-menu" className="flex h-8 w-8 items-center justify-center rounded-none border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[11px] font-bold text-[hsl(var(--foreground))] transition-colors hover:border-[hsl(var(--primary))]">{ownerInitials}</button><AccountMenu open={headerMenuOpen} onClose={() => setHeaderMenuOpen(false)} onOpenProfile={() => setProfileModal(true)} onLogout={doLogout} anchor="top-right" /></div></div>
           </div>
           {mobileNav && <div className="animate-rise-in border-t border-[hsl(var(--border))] px-5 py-3 sm:px-8 md:hidden">
             <nav className="grid grid-cols-2 gap-2">
@@ -880,7 +857,6 @@ function AuthShell({ children }: { children: ReactNode }) {
         <div className="mb-8 flex items-center gap-3">
           <Logo />
           <div><p className="display text-[22px]">RentGrid</p><p className="mono text-[9px] uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">rent & asset control</p></div>
-          <ThemeSwap className="ml-auto" />
         </div>
         {children}
       </div>

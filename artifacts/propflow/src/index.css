@@ -34,83 +34,17 @@
   --radius-xl: 0px;
 }
 
-/* Two-colour "swap" palette. The page is one flat colour (--c-main), the other
-   colour (--c-alt) is the loud accent, and a near-black brown ink does all the
-   outlines, text and hard shadows. Swapping the theme just exchanges the two
-   colours; everything else reads from the semantic tokens below. */
+/* Dark neon palette: near-black panels, cyan outlines that glow, orange as the hot
+   accent. --ink is the dark brown used for text sitting on bright cyan/orange fills;
+   --line drives outlines, hard shadows and the dotted grid. */
 :root {
   --ink: 17 38% 10%;
   --c-main: 188 86% 53%;
   --c-alt: 16 100% 56%;
-  --c-tint: 188 85% 90%;
-  --c-soft: 188 72% 78%;
-
-  --background: var(--c-main);
-  --foreground: var(--ink);
-  --border: var(--ink);
-  --input: var(--ink);
-  --ring: var(--ink);
-  --card: var(--c-tint);
-  --card-foreground: var(--ink);
-  --card-border: var(--ink);
-  --popover: var(--c-tint);
-  --popover-foreground: var(--ink);
-  --primary: var(--ink);
-  --primary-foreground: var(--c-main);
-  --secondary: var(--c-tint);
-  --secondary-foreground: var(--ink);
-  --muted: var(--c-soft);
-  --muted-foreground: 17 30% 24%;
-  --accent: var(--c-alt);
-  --accent-foreground: var(--ink);
-  --destructive: 355 85% 32%;
-  --destructive-foreground: 0 0% 100%;
-  --sidebar: var(--ink);
-  --sidebar-foreground: var(--c-main);
-  --sidebar-border: 17 22% 24%;
-  --sidebar-primary: var(--c-alt);
-  --sidebar-primary-foreground: var(--ink);
-  --sidebar-accent: 17 30% 17%;
-  --sidebar-accent-foreground: var(--c-main);
-  --chart-1: var(--ink);
-  --chart-2: var(--c-alt);
-  --chart-3: var(--c-main);
-  --chart-4: 17 30% 45%;
-  --chart-5: var(--c-tint);
-  --app-font-sans: 'Barlow', system-ui, sans-serif;
-  --app-font-mono: 'JetBrains Mono', ui-monospace, monospace;
-  --radius: 0px;
-  --primary-border: hsl(var(--ink));
-  --secondary-border: hsl(var(--ink));
-  --accent-border: hsl(var(--ink));
-  --destructive-border: hsl(var(--ink));
-  --muted-border: hsl(var(--ink));
-  --line: var(--ink);
-  --grid: var(--ink);
-  --dot: var(--ink);
-  --shadow-sm: 3px 3px 0 hsl(var(--line));
-  --shadow-md: 6px 6px 0 hsl(var(--line));
-  color-scheme: light;
-}
-
-:root[data-theme='orange'] {
-  --c-main: 16 100% 56%;
-  --c-alt: 188 86% 53%;
-  --c-tint: 20 100% 91%;
-  --c-soft: 16 100% 78%;
-  --chart-4: 17 38% 30%;
-}
-
-/* Dark neon: near-black panels, cyan outlines that glow, orange as the hot accent.
-   Unlike the two flat themes it overrides the semantic tokens directly. */
-:root[data-theme='neon'] {
-  --c-main: 188 86% 53%;
-  --c-alt: 16 100% 56%;
-  --c-tint: 17 30% 8%;
-  --c-soft: 17 25% 13%;
   --line: 188 86% 53%;
   --grid: 188 86% 53%;
   --dot: 16 100% 56%;
+
   --background: 20 36% 3.5%;
   --foreground: 28 100% 95%;
   --border: 188 86% 53%;
@@ -143,6 +77,15 @@
   --chart-3: 28 100% 95%;
   --chart-4: 188 50% 35%;
   --chart-5: 17 30% 20%;
+
+  --app-font-sans: 'Barlow', system-ui, sans-serif;
+  --app-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --radius: 0px;
+  --primary-border: hsl(var(--line));
+  --secondary-border: hsl(var(--line));
+  --accent-border: hsl(var(--line));
+  --destructive-border: hsl(var(--line));
+  --muted-border: hsl(var(--line));
   --shadow-sm: 4px 4px 0 hsl(var(--line) / .28), 0 0 20px hsl(var(--line) / .22);
   --shadow-md: 6px 6px 0 hsl(var(--line) / .3), 0 0 30px hsl(var(--line) / .3);
   color-scheme: dark;
@@ -154,8 +97,7 @@
   body { @apply font-sans antialiased bg-background text-foreground; transition: background-color .25s ease; }
   button, a, input, select { -webkit-tap-highlight-color: transparent; }
   button { cursor: pointer; font-family: 'Chakra Petch', var(--app-font-sans); text-transform: uppercase; letter-spacing: .06em; }
-  ::selection { background: hsl(var(--ink)); color: hsl(var(--c-main)); }
-  :root[data-theme='neon'] ::selection { background: hsl(var(--c-main)); color: hsl(var(--ink)); }
+  ::selection { background: hsl(var(--c-main)); color: hsl(var(--ink)); }
   :focus-visible { outline: 3px solid hsl(var(--c-alt)); outline-offset: 2px; }
 }
 
@@ -198,24 +140,20 @@ input::placeholder { color: hsl(var(--muted-foreground)); }
 .safe-x { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
 .text-balance { text-wrap: balance; }
 
-/* Building logo: colours follow the active theme. `.logo-inverse` (used on dark
-   surfaces like the sidebar) swaps badge and details; neon is always inverse. */
-.logo-badge { fill: hsl(var(--ink)); }
-.logo-detail { fill: hsl(var(--c-main)); }
-.logo-roof { stroke: hsl(var(--c-main)); }
+/* Building logo: cyan badge, dark details, orange accent (the lit window and arrow) */
+.logo-badge { fill: hsl(var(--c-main)); }
+.logo-detail { fill: hsl(var(--ink)); }
+.logo-roof { stroke: hsl(var(--ink)); }
 .logo-accent { fill: hsl(var(--c-alt)); }
 .logo-arrow { stroke: hsl(var(--c-alt)); }
-.logo-inverse .logo-badge, :root[data-theme='neon'] .logo .logo-badge { fill: hsl(var(--c-main)); }
-.logo-inverse .logo-detail, :root[data-theme='neon'] .logo .logo-detail { fill: hsl(var(--ink)); }
-.logo-inverse .logo-roof, :root[data-theme='neon'] .logo .logo-roof { stroke: hsl(var(--ink)); }
 
 /* Neon extras: glow on headlines, panels and the poster */
-:root[data-theme='neon'] body { background-image: radial-gradient(circle at 88% -4%, hsl(16 100% 56% / .2), transparent 260px), radial-gradient(circle at 0% 14%, hsl(188 86% 53% / .16), transparent 300px); }
-:root[data-theme='neon'] .display { text-shadow: 0 0 16px hsl(188 86% 53% / .35); }
-:root[data-theme='neon'] .slant-poster .display, :root[data-theme='neon'] .tilt .display { text-shadow: none; }
-:root[data-theme='neon'] .glass { background: linear-gradient(160deg, hsl(17 28% 9%), hsl(17 30% 6%)); }
-:root[data-theme='neon'] .ink-panel { background: hsl(17 40% 4%); box-shadow: 0 0 14px hsl(188 86% 53% / .35), inset 0 0 14px hsl(188 86% 53% / .1); }
-:root[data-theme='neon'] .poster-wrap { filter: drop-shadow(0 0 26px hsl(16 100% 56% / .45)); }
+body { background-image: radial-gradient(circle at 88% -4%, hsl(16 100% 56% / .2), transparent 260px), radial-gradient(circle at 0% 14%, hsl(188 86% 53% / .16), transparent 300px); }
+.display { text-shadow: 0 0 16px hsl(188 86% 53% / .35); }
+.slant-poster .display, .tilt .display { text-shadow: none; }
+.glass { background: linear-gradient(160deg, hsl(17 28% 9%), hsl(17 30% 6%)); }
+.ink-panel { background: hsl(17 40% 4%); box-shadow: 0 0 14px hsl(188 86% 53% / .35), inset 0 0 14px hsl(188 86% 53% / .1); }
+.poster-wrap { filter: drop-shadow(0 0 26px hsl(16 100% 56% / .45)); }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-rise-in, .pulse-dot, .skeleton { animation: none; }
