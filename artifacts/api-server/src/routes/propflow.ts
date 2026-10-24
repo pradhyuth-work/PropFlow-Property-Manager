@@ -66,6 +66,39 @@ const addMonthKey = (key: string, delta: number): string => {
   return `${year}-${String(month).padStart(2, "0")}`;
 };
 
+// rent_changes is created on first use so a deploy doesn't depend on someone
+// remembering to run `db push` first. The shape matches lib/db's schema.
+let rentChangesReady: Promise<void> | null = null;
+function ensureRentChangesTable(): Promise<void> {
+  if (!rentChangesReady) {
+    rentChangesReady = (async () => {
+      await pool.query(`CREATE TABLE IF NOT EXISTS rent_changes (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        created_at timestamptz NOT NULL DEFAULT now(),
+        flat_id uuid NOT NULL REFERENCES flats(id),
+        effective_month date NOT NULL,
+        rent numeric(12,2) NOT NULL
+      )`);
+      await pool.query("ALTER TABLE rent_changes ENABLE ROW LEVEL SECURITY");
+    })().catch((error) => { rentChangesReady = null; throw error; });
+  }
+  return rentChangesReady;
+}
+
+// Records that a unit's rent changes from `effectiveMonthKey` onward, keeping
+// every earlier month at the rent it was actually charged. The first time a
+// flat gets a change, its existing rent is saved as the baseline from move-in
+// so those months stop following the current rent.
+async function recordRentChange(flatId: string, oldRent: string | number | null, newRent: number, moveInDate: Date | string | null, effectiveMonthKey: string) {
+  await ensureRentChangesTable();
+  const existing = await pool.query("SELECT 1 FROM rent_changes WHERE flat_id = $1 LIMIT 1", [flatId]);
+  if (!existing.rowCount && oldRent != null && moveInDate && monthKey(moveInDate) < effectiveMonthKey) {
+    await pool.query("INSERT INTO rent_changes (flat_id, effective_month, rent) VALUES ($1,$2,$3)", [flatId, monthKeyToIsoDate(monthKey(moveInDate)), oldRent]);
+  }
+  await pool.query("DELETE FROM rent_changes WHERE flat_id = $1 AND effective_month = $2", [flatId, monthKeyToIsoDate(effectiveMonthKey)]);
+  await pool.query("INSERT INTO rent_changes (flat_id, effective_month, rent) VALUES ($1,$2,$3)", [flatId, monthKeyToIsoDate(effectiveMonthKey), newRent]);
+}
+
 type CyclePaymentRow = { id: string; flat_id: string; payment_date: Date; amount: string | number; cycle_month: Date | null; created_at: Date };
 type CycleResult = {
   cycles: { cycleMonth: string; status: "paid" | "due" | "part-paid"; rentDue: number; totalPaid: number; payments: { id: string; createdAt: string; flatId: string; paymentDate: string; amount: number; cycleMonth: string | null }[] }[];
@@ -100,13 +133,36 @@ async function buildFlatCycles(flatsForCycles: { id: string; moveInDate: Date | 
     paymentsByFlat.get(row.flat_id)!.push(row);
   }
 
+  await ensureRentChangesTable();
+  const changesResult = await pool.query<{ flat_id: string; effective_month: Date; rent: string | number }>(
+    `SELECT flat_id, effective_month, rent FROM rent_changes WHERE flat_id = ANY($1) ORDER BY effective_month ASC`,
+    [ids],
+  );
+  const changesByFlat = new Map<string, { monthKey: string; rent: number }[]>();
+  for (const row of changesResult.rows) {
+    if (!changesByFlat.has(row.flat_id)) changesByFlat.set(row.flat_id, []);
+    changesByFlat.get(row.flat_id)!.push({ monthKey: monthKey(row.effective_month), rent: Number(row.rent) });
+  }
+
   for (const flat of flatsForCycles) {
     if (!flat.moveInDate) {
       result.set(flat.id, { cycles: [], oldestDueCycle: null, dueCycleCount: 0 });
       continue;
     }
     const moveInMonthKey = monthKey(flat.moveInDate);
-    const rentDue = Number(flat.rent ?? 0);
+    const currentRent = Number(flat.rent ?? 0);
+    const flatChanges = changesByFlat.get(flat.id) ?? [];
+    // The rent in force for a month is the latest change on or before it; a
+    // month before every recorded change (or a flat with none) uses the
+    // earliest recorded rent, or the current rent when there's no history.
+    const rentForCycle = (cursor: string) => {
+      if (!flatChanges.length) return currentRent;
+      let rent = flatChanges[0].rent;
+      for (const change of flatChanges) {
+        if (change.monthKey <= cursor) rent = change.rent;
+      }
+      return rent;
+    };
     const flatPayments = paymentsByFlat.get(flat.id) ?? [];
     const paidByCycle = new Map<string, CyclePaymentRow[]>();
     for (const payment of flatPayments) {
@@ -120,6 +176,7 @@ async function buildFlatCycles(flatsForCycles: { id: string; moveInDate: Date | 
     let oldestDueCycle: string | null = null;
     let dueCycleCount = 0;
     for (let cursor = moveInMonthKey; cursor <= lastCompletedMonthKey; cursor = addMonthKey(cursor, 1)) {
+      const rentDue = rentForCycle(cursor);
       const cyclePayments = paidByCycle.get(cursor) ?? [];
       const totalPaidInCycle = cyclePayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
       const status: "paid" | "due" | "part-paid" = totalPaidInCycle <= 0 ? "due" : totalPaidInCycle < rentDue ? "part-paid" : "paid";
@@ -288,6 +345,15 @@ router.patch("/flats/:id", async (req, res, next) => {
     );
     if (!result.rowCount) return res.status(404).json({ error: "Flat not found" });
     const row = result.rows[0];
+    // Editing the rent here is a correction to the rent currently in force, so
+    // it updates the latest rent period rather than re-pricing older months.
+    if (input.rent != null) {
+      await ensureRentChangesTable();
+      await pool.query(
+        `UPDATE rent_changes SET rent=$1 WHERE id = (SELECT id FROM rent_changes WHERE flat_id=$2 ORDER BY effective_month DESC LIMIT 1)`,
+        [input.rent, id],
+      );
+    }
     const property = await pool.query("SELECT name FROM properties WHERE id = $1", [row.property_id]);
     const totals = await pool.query(
       "SELECT COALESCE(SUM(amount),0) AS total_paid, MAX(payment_date) AS last_payment_date FROM payments WHERE flat_id = $1",
@@ -323,6 +389,7 @@ router.post("/flats/:id/renew", async (req, res, next) => {
     // Renewing only extends the tenure and (optionally) updates rent -
     // moveInDate is untouched since the tenant didn't move in again. Only
     // applies to an occupied unit; a vacant one has no lease to renew.
+    const before = await pool.query("SELECT rent, move_in_date, tenure_end FROM flats WHERE id=$1 AND deleted_at IS NULL AND tenant_name IS NOT NULL", [id]);
     const result = await pool.query(
       `UPDATE flats SET tenure_end=$1, rent=$2 WHERE id=$3 AND deleted_at IS NULL AND tenant_name IS NOT NULL
        RETURNING *, (tenure_end IS NOT NULL AND tenure_end < CURRENT_DATE) AS is_expired, (tenant_name IS NOT NULL) AS is_occupied`,
@@ -330,6 +397,18 @@ router.post("/flats/:id/renew", async (req, res, next) => {
     );
     if (!result.rowCount) return res.status(404).json({ error: "Flat not found" });
     const row = result.rows[0];
+    // The new rent starts with the cycle that contains the day after the old
+    // lease ended, so months already billed under the old lease keep the old
+    // rent. (Falls back to the current month if there was no tenure end.)
+    const oldRow = before.rows[0];
+    if (oldRow && Number(oldRow.rent ?? 0) !== Number(input.rent)) {
+      let effectiveMonthKey = monthKey(new Date().toISOString());
+      if (oldRow.tenure_end) {
+        const [y, m, d] = isoDate(oldRow.tenure_end).split("-").map(Number);
+        effectiveMonthKey = monthKey(new Date(Date.UTC(y, m - 1, d + 1)).toISOString());
+      }
+      await recordRentChange(id, oldRow.rent, Number(input.rent), oldRow.move_in_date, effectiveMonthKey);
+    }
     const property = await pool.query("SELECT name FROM properties WHERE id = $1", [row.property_id]);
     const totals = await pool.query(
       "SELECT COALESCE(SUM(amount),0) AS total_paid, MAX(payment_date) AS last_payment_date FROM payments WHERE flat_id = $1",

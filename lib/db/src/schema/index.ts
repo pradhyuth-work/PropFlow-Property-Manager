@@ -61,6 +61,19 @@ export const payments = pgTable("payments", {
   cycleMonth: date("cycle_month"),
 }).enableRLS();
 
+// Rent a unit charges from a given calendar month onward. A flat's own `rent`
+// column is only the CURRENT rent, so without this a renewal at a new rent
+// would re-price every past cycle and show phantom dues on months that were
+// paid in full at the old rent. A cycle's rent is the latest row here whose
+// effectiveMonth (always the 1st) is on or before that cycle's month.
+export const rentChanges = pgTable("rent_changes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  flatId: uuid("flat_id").references(() => flats.id).notNull(),
+  effectiveMonth: date("effective_month").notNull(),
+  rent: numeric("rent", { precision: 12, scale: 2 }).notNull(),
+}).enableRLS();
+
 export const insertOwnerSchema = createInsertSchema(owners);
 export const insertPropertySchema = createInsertSchema(properties);
 export const insertFlatSchema = createInsertSchema(flats);
