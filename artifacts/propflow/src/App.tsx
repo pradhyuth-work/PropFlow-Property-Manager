@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/reac
 import { Activity, ArrowDownRight, ArrowLeft, ArrowUpRight, Building2, CalendarRange, Check, ChevronRight, CircleDollarSign, ClipboardList, Home, LayoutDashboard, LogOut, Menu, MoreHorizontal, Pencil, Plus, ReceiptIndianRupee, Search, Sparkles, Trash2, UserCog, UserMinus, UserPlus, WalletCards, X } from 'lucide-react';
 import type { DateRange } from 'react-day-picker';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { LiveStatus, LoginBackdrop, PinBars, Typewriter } from '@/components/login-fx';
 import { EmptyState, Field, formatCycleMonth, formatDate, formatMoney, Modal, SectionTitle, SkeletonRows, Surface, inputClass } from '@/components/propflow-ui';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -850,13 +851,19 @@ function AuthGate() {
   return <AppShell owner={meQuery.data} />;
 }
 
-function AuthShell({ children }: { children: ReactNode }) {
+function AuthShell({ children, typed = 'Log in to continue' }: { children: ReactNode; typed?: string }) {
   return (
-    <div className="safe-top safe-bottom safe-x flex min-h-[100dvh] items-start justify-center bg-[hsl(var(--background))] px-5 pt-[14vh] sm:items-center sm:pt-0">
-      <div className="w-full max-w-[400px]">
-        <div className="mb-8 flex items-center gap-3">
-          <Logo />
-          <div><p className="display text-[22px]">RentGrid</p><p className="mono text-[9px] uppercase tracking-[.16em] text-[hsl(var(--muted-foreground))]">rent & asset control</p></div>
+    <div className="login-bg safe-top safe-bottom safe-x flex min-h-[100dvh] items-center justify-center px-5 py-10">
+      <LoginBackdrop />
+      <div className="login-wrap login-rise">
+        <div className="mb-6 flex flex-col items-center gap-3 text-center">
+          <div className="login-tile"><Logo className="h-full w-full" /></div>
+          <div className="login-titles">
+            <h1 className="display">RentGrid</h1>
+            <p className="login-kicker">rent &amp; asset control</p>
+            <p className="login-sub"><Typewriter base={typed} /></p>
+            <LiveStatus />
+          </div>
         </div>
         {children}
       </div>
@@ -867,6 +874,7 @@ function AuthShell({ children }: { children: ReactNode }) {
 function SetupScreen({ onDone }: { onDone: () => void }) {
   const [form, setForm] = useState({ name: '', pin: '' });
   const [error, setError] = useState<string | null>(null);
+  const [errorCount, setErrorCount] = useState(0);
   const setup = useSetupOwner();
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -874,27 +882,28 @@ function SetupScreen({ onDone }: { onDone: () => void }) {
     setError(null);
     setup.mutate({ data: form }, {
       onSuccess: onDone,
-      onError: () => setError('Could not create your account. Please try again.'),
+      onError: () => { setError('Could not create your account. Please try again.'); setErrorCount((n) => n + 1); },
     });
   };
 
-  return <AuthShell>
-    <Surface className="p-6 sm:p-8">
-      <h1 className="display text-[28px]">Set up your workspace</h1>
+  return <AuthShell typed="Set up your workspace">
+    <form key={errorCount} onSubmit={submit} className={`login-card${errorCount > 0 ? ' shake' : ''}`}>
+      <h2 className="display text-[22px]">Set up your workspace</h2>
       <p className="mt-1.5 text-[13px] leading-5 text-[hsl(var(--muted-foreground))]">Create the owner account for this RentGrid workspace. You'll use this PIN to log in from now on.</p>
-      <form onSubmit={submit} className="mt-6 space-y-4">
+      <div className="mt-5 space-y-4">
         <Field label="Your name"><input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} data-testid="input-setup-name" className={inputClass()} placeholder="Aarav Shah" /></Field>
-        <Field label="PIN" hint="4 digits"><input required type="password" inputMode="numeric" pattern="\d{4}" maxLength={4} value={form.pin} onChange={(event) => setForm({ ...form, pin: event.target.value.replace(/\D/g, '').slice(0, 4) })} data-testid="input-setup-pin" className={inputClass()} placeholder="••••" /></Field>
-        {error && <p className="text-[12px] font-semibold text-[hsl(var(--destructive))]">{error}</p>}
-        <button type="submit" disabled={setup.isPending} data-testid="button-submit-setup" className="w-full rounded-none bg-[hsl(var(--primary))] py-2.5 text-[12px] font-bold text-[hsl(var(--primary-foreground))] disabled:opacity-50">{setup.isPending ? 'Creating account...' : 'Create account'}</button>
-      </form>
-    </Surface>
+        <Field label="PIN" hint="4 digits"><div className="pin-field"><input required type="password" inputMode="numeric" pattern="\d{4}" maxLength={4} value={form.pin} onChange={(event) => setForm({ ...form, pin: event.target.value.replace(/\D/g, '').slice(0, 4) })} data-testid="input-setup-pin" className={inputClass()} placeholder="••••" /><PinBars length={form.pin.length} /></div></Field>
+        {error && <p className="login-error">{error}</p>}
+        <div className="neon-wrap"><button type="submit" disabled={setup.isPending} data-testid="button-submit-setup" className="login-button">{setup.isPending ? 'Creating account...' : 'Create account'}</button></div>
+      </div>
+    </form>
   </AuthShell>;
 }
 
 function LoginScreen({ onDone }: { onDone: () => void }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [errorCount, setErrorCount] = useState(0);
   const login = useLogin();
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -904,6 +913,7 @@ function LoginScreen({ onDone }: { onDone: () => void }) {
       onSuccess: onDone,
       onError: (err) => {
         setPin('');
+        setErrorCount((n) => n + 1);
         setError(
           err instanceof ApiError && typeof err.data === 'object' && err.data && 'error' in err.data
             ? String((err.data as { error: unknown }).error)
@@ -913,16 +923,16 @@ function LoginScreen({ onDone }: { onDone: () => void }) {
     });
   };
 
-  return <AuthShell>
-    <Surface className="p-6 sm:p-8">
-      <h1 className="display text-[28px]">Welcome back</h1>
+  return <AuthShell typed="Log in to continue">
+    <form key={errorCount} onSubmit={submit} className={`login-card${errorCount > 0 ? ' shake' : ''}`}>
+      <h2 className="display text-[22px]">Welcome back</h2>
       <p className="mt-1.5 text-[13px] leading-5 text-[hsl(var(--muted-foreground))]">Enter your PIN to log in to your RentGrid workspace.</p>
-      <form onSubmit={submit} className="mt-6 space-y-4">
-        <Field label="PIN"><input required autoFocus type="password" inputMode="numeric" pattern="\d{4}" maxLength={4} value={pin} onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 4))} data-testid="input-login-pin" className={inputClass()} /></Field>
-        {error && <p className="text-[12px] font-semibold text-[hsl(var(--destructive))]">{error}</p>}
-        <button type="submit" disabled={login.isPending} data-testid="button-submit-login" className="w-full rounded-none bg-[hsl(var(--primary))] py-2.5 text-[12px] font-bold text-[hsl(var(--primary-foreground))] disabled:opacity-50">{login.isPending ? 'Logging in...' : 'Log in'}</button>
-      </form>
-    </Surface>
+      <div className="mt-5 space-y-4">
+        <Field label="PIN"><div className="pin-field"><input required autoFocus type="password" inputMode="numeric" pattern="\d{4}" maxLength={4} value={pin} onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 4))} data-testid="input-login-pin" className={inputClass()} /><PinBars length={pin.length} /></div></Field>
+        {error && <p className="login-error">{error}</p>}
+        <div className="neon-wrap"><button type="submit" disabled={login.isPending} data-testid="button-submit-login" className="login-button">{login.isPending ? 'Logging in...' : 'Log in'}</button></div>
+      </div>
+    </form>
   </AuthShell>;
 }
 

@@ -159,3 +159,62 @@ body { background-image: radial-gradient(circle at 88% -4%, hsl(16 100% 56% / .2
   .animate-rise-in, .pulse-dot, .skeleton { animation: none; }
   body { transition: none; }
 }
+
+/* ---------- Sign-in / setup screens (ported from the DSRMT + Varasidhi DSR sign-ins; see components/login-fx.tsx) ----------
+   Layout and motion are copied; colours stay PropFlow's own cyan + orange. */
+.login-bg { position: relative; isolation: isolate; background: radial-gradient(120% 70% at 50% 0%, hsl(188 86% 42%) 0%, hsl(188 70% 20%) 35%, hsl(17 40% 6%) 70%, hsl(20 36% 3.5%) 100%); }
+.login-bg::before { content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none; background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px); background-size: 32px 32px; -webkit-mask-image: linear-gradient(#000, transparent 70%); mask-image: linear-gradient(#000, transparent 70%); }
+.login-cv { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: none; }
+.login-tape { position: fixed; top: 0; left: 0; right: 0; height: 32px; z-index: 1; overflow: hidden; white-space: nowrap; display: flex; align-items: center; pointer-events: none;
+  background: rgba(10,8,6,.45); border-bottom: 1px solid hsl(188 86% 53% / .25); color: hsl(188 40% 78%);
+  font-family: var(--app-font-mono); font-size: 10.5px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; }
+.login-tape > div { display: inline-flex; padding-left: 20px; animation: login-tape 70s linear infinite; }
+.login-tape span { padding-right: 24px; }
+@keyframes login-tape { to { transform: translateX(-50%); } }
+
+.login-wrap { position: relative; z-index: 2; width: 100%; max-width: 400px; }
+.login-rise > * { animation: login-rise .6s cubic-bezier(.23,1,.32,1) both; }
+.login-rise > *:nth-child(2) { animation-delay: .1s; }
+@keyframes login-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+.login-tile { width: 56px; height: 56px; padding: 7px; border-radius: 12px; background: hsl(17 40% 5% / .55); box-shadow: 0 8px 24px rgba(0,0,0,.45); animation: login-glow 3.4s ease-in-out 1s infinite; }
+@keyframes login-glow { 0%, 100% { box-shadow: 0 8px 24px rgba(0,0,0,.45), 0 0 0 0 hsl(188 86% 53% / 0); } 50% { box-shadow: 0 8px 24px rgba(0,0,0,.45), 0 0 0 7px hsl(188 86% 53% / .22); } }
+.login-titles { position: relative; padding-bottom: 20px; }
+.login-titles h1 { margin: 0; font-size: 1.75rem; color: #eef5f0; text-shadow: 0 2px 0 rgba(0,0,0,.45), 0 4px 14px rgba(0,0,0,.6), 0 0 24px hsl(188 86% 53% / .4); }
+.login-kicker { margin: 4px 0 0; font-family: var(--app-font-mono); font-size: 9px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; color: hsl(188 50% 82%); }
+.login-sub { margin: 8px 0 0; min-height: 1.25rem; font-family: var(--app-font-mono); font-size: 13px; color: hsl(188 45% 88%); }
+.login-status { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; align-items: center; gap: 8px; margin: 0; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: hsl(188 40% 78%); }
+.login-status b { font-weight: 400; color: #eef5f0; }
+.login-status i { width: 7px; height: 7px; border-radius: 50%; background: hsl(var(--c-alt)); animation: login-ping 2s ease-out infinite; }
+@keyframes login-ping { 0% { box-shadow: 0 0 0 0 hsl(16 100% 56% / .6); } 70%, 100% { box-shadow: 0 0 0 8px transparent; } }
+
+.login-card { position: relative; padding: 22px; background: rgba(10,8,6,.6); border: 1px solid hsl(188 86% 53% / .28); color: #eef5f0; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 18px 50px rgba(0,0,0,.55), 0 0 31px hsl(188 86% 53% / .18); }
+.login-card.shake { animation: login-shake .4s cubic-bezier(.23,1,.32,1); }
+@keyframes login-shake { 20% { transform: translateX(-8px); } 40% { transform: translateX(7px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); } }
+.login-card .label, .login-card label > span.label { color: hsl(188 40% 78%); }
+.login-card input { background: rgba(0,0,0,.45); border-color: hsl(188 86% 53% / .3); color: #eef5f0; }
+.login-card input:focus { border-color: hsl(var(--c-main)); box-shadow: 0 0 0 3px hsl(188 86% 53% / .18); }
+.login-card h2 { color: #eef5f0; }
+
+.pin-field { position: relative; padding-bottom: 14px; }
+.pin-bars { position: absolute; left: 0; bottom: 0; display: flex; gap: 6px; height: 6px; }
+.pin-bars i { width: 22px; height: 4px; border-radius: 4px; background: rgba(238,245,240,.18); transition: background .2s, transform .25s; }
+.pin-bars i.on { background: hsl(var(--c-main)); transform: scaleY(1.5); }
+
+/* Slanted neon button. The glow sits on a wrapper because clip-path would cut off the button's own shadow. */
+.neon-wrap { filter: drop-shadow(0 0 5px hsl(188 86% 53% / .8)) drop-shadow(0 0 16px hsl(188 86% 53% / .45)); animation: neon-pulse 2.8s ease-in-out infinite; transition: filter .2s ease, opacity .2s ease; }
+.neon-wrap:hover:not(:has(:disabled)) { filter: drop-shadow(0 0 7px hsl(188 86% 60% / .95)) drop-shadow(0 0 24px hsl(188 86% 53% / .65)); }
+.neon-wrap:has(:disabled) { animation: none; opacity: .55; filter: drop-shadow(0 0 3px hsl(188 86% 53% / .3)); }
+@keyframes neon-pulse { 0%, 100% { filter: drop-shadow(0 0 5px hsl(188 86% 53% / .8)) drop-shadow(0 0 16px hsl(188 86% 53% / .45)); } 50% { filter: drop-shadow(0 0 7px hsl(188 86% 60% / .95)) drop-shadow(0 0 22px hsl(188 86% 53% / .62)); } }
+.login-button { position: relative; overflow: hidden; width: 100%; min-height: 44px; border: 0; border-radius: 0; clip-path: polygon(7% 0, 100% 0, 93% 100%, 0 100%); background: hsl(var(--c-main)); color: hsl(var(--ink)); font-family: var(--app-font-mono); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; transition: background .18s, filter .18s; }
+.login-button::after { content: ""; position: absolute; inset: 0; pointer-events: none; transform: translateX(-120%); background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.35) 50%, transparent 65%); }
+.login-button:hover:not(:disabled) { background: hsl(188 86% 62%); }
+.login-button:hover:not(:disabled)::after { transform: translateX(120%); transition: transform .7s cubic-bezier(.23,1,.32,1); }
+.login-button:disabled { cursor: not-allowed; }
+.login-error { margin: 0; font-size: 12px; font-weight: 600; color: hsl(var(--destructive)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .login-tape > div, .login-tile, .login-status i, .login-rise > *, .login-card.shake, .neon-wrap { animation: none; }
+  .login-tape { display: none; }
+  .login-button::after { display: none; }
+}
